@@ -21,6 +21,10 @@ import lk.nenasayura.app.ui.student.StudentHomeScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
+import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
+import lk.nenasayura.app.ui.guest.quizzes.QuizScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -81,7 +85,22 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         composable(Routes.GUIDE_BOOKS) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
         } // Task 4
-        placeholder(Routes.QUIZZES, "Quizzes", navController)                 // Task 5
+        composable(Routes.QUIZZES) {
+            QuizListScreen(
+                onBack = { navController.popBackStack() },
+                onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
+            )
+        }
+
+        composable(
+            route = Routes.QUIZ_PLAY,
+            arguments = listOf(navArgument("quizId") { type = NavType.StringType })
+        ) {
+            QuizScreen(
+                onBack = { navController.popBackStack() },
+                onLogin = { navController.navigate(Routes.LOGIN) }
+            )
+        } // Task 5
         placeholder(Routes.SEARCH, "Search", navController)                   // Task 6
     }
 }

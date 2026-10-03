@@ -14,5 +14,7 @@ object Routes {
     const val MARKING_SCHEMES = "marking_schemes"
     const val GUIDE_BOOKS = "guide_books"
     const val QUIZZES = "quizzes"
+    const val QUIZ_PLAY = "quiz/{quizId}"
+    fun quizRoute(quizId: String) = "quiz/$quizId"
     const val SEARCH = "search"
 }
