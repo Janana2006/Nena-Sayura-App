@@ -14,5 +14,13 @@ object Routes {
     const val MARKING_SCHEMES = "marking_schemes"
     const val GUIDE_BOOKS = "guide_books"
     const val QUIZZES = "quizzes"
+    const val QUIZ_PLAY = "quiz/{quizId}"
+    fun quizRoute(quizId: String) = "quiz/$quizId"
+
+    // Student-only screens (reached from Student Home)
+    const val TEACHERS = "teachers"
+    const val TIMETABLE = "timetable"
+    const val REMINDERS = "reminders"
+    const val ANALYTICS = "analytics"
     const val SEARCH = "search"
 }

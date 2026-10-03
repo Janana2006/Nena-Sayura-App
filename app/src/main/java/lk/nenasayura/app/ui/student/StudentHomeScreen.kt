@@ -1,5 +1,6 @@
 package lk.nenasayura.app.ui.student
 
+
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ fun StudentHomeScreen(
             val intent = Intent(context, MainActivity::class.java)
             context.startActivity(intent)
             (context as? android.app.Activity)?.finish()
+
         }
     )
 }
