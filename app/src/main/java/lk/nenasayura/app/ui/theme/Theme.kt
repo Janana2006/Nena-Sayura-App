@@ -1,6 +1,5 @@
 package lk.nenasayura.app.ui.theme
 
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -9,35 +8,40 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = NenaPrimaryDark,
+    onPrimary = NenaOnPrimaryDark,
+    secondary = NenaSecondaryDark,
+    tertiary = NenaAccentDark,
+    background = NenaBackgroundDark,
+    surface = NenaSurfaceDark
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
+    primary = NenaPrimary,
     onPrimary = Color.White,
+    primaryContainer = NenaPrimaryContainer,
+    onPrimaryContainer = NenaPrimary,
+    secondary = NenaSecondary,
     onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    secondaryContainer = NenaSecondaryContainer,
+    onSecondaryContainer = NenaSecondary,
+    tertiary = NenaAccent,
+    onTertiary = Color.Black,
+    tertiaryContainer = NenaAccentContainer,
+    background = NenaBackground,
+    surface = NenaSurface
 )
 
 @Composable
 fun NenaSayuraAppTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // Off by default so the Nena Sayura brand colours are always shown.
+    // (With minSdk 31, dynamic colour would otherwise override them on every device.)
+    dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val colorScheme = when {
