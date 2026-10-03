@@ -1,0 +1,99 @@
+package lk.nenasayura.app.ui.guest.guidebooks
+
+
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import lk.nenasayura.app.data.model.GuideBook
+import lk.nenasayura.app.data.model.Subject
+import lk.nenasayura.app.data.repository.GuideBookRepository
+import lk.nenasayura.app.data.repository.SubjectRepository
+
+/** Everything the Guide Books screen needs to draw itself. */
+data class GuideBooksUiState(
+    val isLoading: Boolean = true,
+    val errorMessage: String? = null,
+    val books: List<GuideBook> = emptyList(),
+    val subjects: List<Subject> = emptyList(),
+    val selectedSubjectId: String? = null,
+    val query: String = ""
+) {
+    fun subjectName(subjectId: String): String =
+        subjects.firstOrNull { it.id == subjectId }?.name ?: ""
+
+    // Only offer subjects that actually have guide books
+    val availableSubjects: List<Subject>
+        get() {
+            val usedIds = books.map { it.subjectId }.toSet()
+            return subjects.filter { it.id in usedIds }
+        }
+
+    val hasActiveFilters: Boolean
+        get() = selectedSubjectId != null || query.isNotBlank()
+
+    val filteredBooks: List<GuideBook>
+        get() {
+            val text = query.trim()
+            return books.filter { book ->
+                (selectedSubjectId == null || book.subjectId == selectedSubjectId) &&
+                        (text.isEmpty() ||
+                                book.title.contains(text, ignoreCase = true) ||
+                                book.author.contains(text, ignoreCase = true) ||
+                                subjectName(book.subjectId).contains(text, ignoreCase = true))
+            }
+        }
+}
+
+class GuideBooksViewModel(
+    private val guideBookRepository: GuideBookRepository = GuideBookRepository(),
+    private val subjectRepository: SubjectRepository = SubjectRepository()
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(GuideBooksUiState())
+    val uiState: StateFlow<GuideBooksUiState> = _uiState.asStateFlow()
+
+    init {
+        load()
+    }
+
+    fun load() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, errorMessage = null) }
+            try {
+                // Load guide books and subjects at the same time
+                val (books, subjects) = coroutineScope {
+                    val booksJob = async { guideBookRepository.getGuideBooks() }
+                    val subjectsJob = async { subjectRepository.getSubjects() }
+                    booksJob.await() to subjectsJob.await()
+                }
+                _uiState.update {
+                    it.copy(isLoading = false, books = books, subjects = subjects)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = "Could not load guide books. Check your internet connection and try again."
+                    )
+                }
+            }
+        }
+    }
+
+    fun onQueryChange(value: String) = _uiState.update { it.copy(query = value) }
+    fun onSubjectSelected(subjectId: String?) = _uiState.update { it.copy(selectedSubjectId = subjectId) }
+
+    fun clearFilters() = _uiState.update {
+        it.copy(selectedSubjectId = null, query = "")
+    }
+}
