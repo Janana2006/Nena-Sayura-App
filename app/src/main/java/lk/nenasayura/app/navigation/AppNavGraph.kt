@@ -19,6 +19,7 @@ import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.student.StudentHomeScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
+import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -72,8 +73,10 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         // Placeholders: each is replaced by a real screen in its own task
         composable(Routes.PAPERS) {
             PapersScreen(onBack = { navController.popBackStack() })
-        }                // Task 2
-        placeholder(Routes.MARKING_SCHEMES, "Marking Schemes", navController) // Task 3
+        }  // Task 2
+        composable(Routes.MARKING_SCHEMES) {
+            MarkingSchemesScreen(onBack = { navController.popBackStack() })
+        } // Task 3
         placeholder(Routes.GUIDE_BOOKS, "Guide Books", navController)         // Task 4
         placeholder(Routes.QUIZZES, "Quizzes", navController)                 // Task 5
         placeholder(Routes.SEARCH, "Search", navController)                   // Task 6
