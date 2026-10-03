@@ -16,5 +16,11 @@ object Routes {
     const val QUIZZES = "quizzes"
     const val QUIZ_PLAY = "quiz/{quizId}"
     fun quizRoute(quizId: String) = "quiz/$quizId"
+
+    // Student-only screens (reached from Student Home)
+    const val TEACHERS = "teachers"
+    const val TIMETABLE = "timetable"
+    const val REMINDERS = "reminders"
+    const val ANALYTICS = "analytics"
     const val SEARCH = "search"
 }

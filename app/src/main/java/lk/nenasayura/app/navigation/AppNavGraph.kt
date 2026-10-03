@@ -26,6 +26,7 @@ import androidx.navigation.navArgument
 import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
 import lk.nenasayura.app.ui.guest.quizzes.QuizScreen
 import lk.nenasayura.app.ui.guest.search.SearchScreen
+import lk.nenasayura.app.ui.student.StudentHomeActions
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -73,7 +74,20 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
         // Replaced by the full Student Home in Task 7
         composable(Routes.STUDENT_HOME) {
-            StudentHomeScreen(onSignOut = { AppSession.provider.signOut() })
+            StudentHomeScreen(
+                actions = StudentHomeActions(
+                    onOpenPapers = { navController.navigate(Routes.PAPERS) },
+                    onOpenMarkingSchemes = { navController.navigate(Routes.MARKING_SCHEMES) },
+                    onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
+                    onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
+                    onOpenSearch = { navController.navigate(Routes.SEARCH) },
+                    onOpenTeachers = { navController.navigate(Routes.TEACHERS) },
+                    onOpenTimetable = { navController.navigate(Routes.TIMETABLE) },
+                    onOpenReminders = { navController.navigate(Routes.REMINDERS) },
+                    onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) }
+                ),
+                onSignOut = { AppSession.provider.signOut() }
+            )
         }
 
         // Placeholders: each is replaced by a real screen in its own task
@@ -108,6 +122,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
             )
         } // Task 6
+        // Student-only screens: each is replaced by a real screen in its own task
+        placeholder(Routes.TEACHERS, "Teachers", navController)              // Tasks 8 and 9
+        placeholder(Routes.TIMETABLE, "Timetable", navController)            // Task 10
+        placeholder(Routes.REMINDERS, "Reminders", navController)            // Task 11
+        placeholder(Routes.ANALYTICS, "Study Analytics", navController)      // Task 12
     }
 }
 
