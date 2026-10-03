@@ -1,9 +1,11 @@
 package lk.nenasayura.app.navigation
 
+import android.app.Activity
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -32,6 +34,13 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
+    // CHANGED: Log in click kalama oyage real Login screen (MainActivity) ekata yanawa
+    val context = LocalContext.current
+    val openRealLogin: () -> Unit = {
+        context.startActivity(Intent(context, MainActivity::class.java))
+        (context as? Activity)?.finish()
+    }
+
     // Keep the visible home in step with the login state:
     //  - a student who just logged in (or an already restored session) goes to Student Home
     //  - after sign-out the user goes back to Guest Home
@@ -57,16 +66,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
                 onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
-                onLogin = {
-                    val context = navController.context
-                    val intent = Intent(context, MainActivity::class.java)
-                    context.startActivity(intent)
-                    (context as? android.app.Activity)?.finish()
-                }
+                onLogin = openRealLogin   // CHANGED
             )
         }
 
-        // Replaced by the authentication teammate's Login screen
+        // Dan use wenne naha (onLogin dan MainActivity ekata yanawa), hebai ain karanna epa
         composable(Routes.LOGIN) {
             LoginPlaceholderScreen(onBack = { navController.popBackStack() })
         }

@@ -11,21 +11,15 @@ class SetupRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
+    // streams collection eken okkoma streams + subjects
     fun getStreams(onResult: (Result<List<StudyStream>>) -> Unit) {
         db.collection("streams").orderBy("order").get()
             .addOnSuccessListener { snapshot ->
                 val list = snapshot.documents.map { doc ->
-                    val subjects = (doc.get("subjects") as? List<*>)?.mapNotNull { item ->
-                        val map = item as? Map<*, *> ?: return@mapNotNull null
-                        val id = map["id"] as? String ?: return@mapNotNull null
-                        val name = map["name"] as? String ?: return@mapNotNull null
-                        Subject(id = id, name = name)
-                    } ?: emptyList()
-
                     StudyStream(
                         id = doc.id,
                         name = doc.getString("name") ?: doc.id,
-                        subjects = subjects
+                        subjects = parseSubjects(doc.get("subjects"))
                     )
                 }
                 onResult(Result.success(list))
@@ -33,6 +27,43 @@ class SetupRepository(
             .addOnFailureListener { onResult(Result.failure(it)) }
     }
 
+    // subjects format 2kama handle karanawa
+    private fun parseSubjects(raw: Any?): List<Subject> {
+        return when (raw) {
+
+            // Format 1: subjects = map  { physics: "Physics", chemistry: "Chemistry" }
+            is Map<*, *> -> raw.entries
+                .mapNotNull { entry ->
+                    val id = entry.key as? String ?: return@mapNotNull null
+                    val name = entry.value as? String ?: return@mapNotNull null
+                    Subject(id = id, name = name)
+                }
+                .sortedBy { it.name }
+
+            // Format 2: subjects = array of maps
+            is List<*> -> raw.flatMap { item ->
+                val map = item as? Map<*, *> ?: return@flatMap emptyList<Subject>()
+                val id = map["id"] as? String
+                val name = map["name"] as? String
+
+                if (id != null && name != null) {
+                    // { id: "physics", name: "Physics" }
+                    listOf(Subject(id = id, name = name))
+                } else {
+                    // { physics: "Physics" }
+                    map.entries.mapNotNull { entry ->
+                        val key = entry.key as? String ?: return@mapNotNull null
+                        val value = entry.value as? String ?: return@mapNotNull null
+                        Subject(id = key, name = value)
+                    }
+                }
+            }
+
+            else -> emptyList()
+        }
+    }
+
+    // Teacher ge selection eka save karala setupDone = true karanawa
     fun saveTeacherSetup(
         stream: StudyStream,
         subjects: List<Subject>,

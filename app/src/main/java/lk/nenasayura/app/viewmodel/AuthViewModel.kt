@@ -23,6 +23,26 @@ class AuthViewModel(
     fun isLoggedIn(): Boolean = repo.isLoggedIn()
     fun getCurrentUser(): User? = repo.getCurrentUser()
 
+    fun loadProfile(onResult: (Result<User?>) -> Unit) = repo.getProfile(onResult)
+
+    // Login una passe yanna oni screen eka decide karanawa
+    fun checkDestination(onResult: (Result<String>) -> Unit) {
+        repo.getProfile { result ->
+            result.fold(
+                onSuccess = { user ->
+                    val route = when {
+                        user == null -> "Login"
+                        user.role == "teacher" && !user.setupDone -> "TeacherSetup"
+                        user.role == "teacher" -> "TeacherHome"
+                        else -> "Home"
+                    }
+                    onResult(Result.success(route))
+                },
+                onFailure = { onResult(Result.failure(it)) }
+            )
+        }
+    }
+
     fun login(email: String, password: String) {
         if (!Validators.isValidEmail(email)) return showError("Enter a valid email")
         if (password.isEmpty()) return showError("Enter your password")
