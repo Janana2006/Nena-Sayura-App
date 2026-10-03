@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "417865192395",
+    "project_id": "nena-sayura-app",
+    "storage_bucket": "nena-sayura-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:417865192395:android:b532ba9a0a64c0eb531c4e",
+        "android_client_info": {
+          "package_name": "lk.nenasayura.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "417865192395-3mje3rhmn6f3j7266pbsf29ui5qtfvtv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "lk.nenasayura.app",
+            "certificate_hash": "555699a7d59705e822093ee66735515330eee5cb"
+          }
+        },
+        {
+          "client_id": "417865192395-m2cbj09nbjrf0bohnrouhs1flohnl29t.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlWMp0PwN71z56QCwn5X9fa90eYnEwQhc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "417865192395-m2cbj09nbjrf0bohnrouhs1flohnl29t.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
