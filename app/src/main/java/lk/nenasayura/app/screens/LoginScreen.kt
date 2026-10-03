@@ -1,5 +1,6 @@
 package lk.nenasayura.app.screens
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
+import lk.nenasayura.app.GuestHomeActivity
 import lk.nenasayura.app.components.GoogleSignInButton
 import lk.nenasayura.app.util.GoogleSignInHelper
 import lk.nenasayura.app.viewmodel.AuthUiState
@@ -257,9 +259,13 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Guest
+            // Continue as Guest -> Opens GuestHomeActivity
             TextButton(
-                onClick = { onNavigate("Home") },
+                onClick = {
+                    val intent = Intent(context, GuestHomeActivity::class.java)
+                    context.startActivity(intent)
+                    (context as? android.app.Activity)?.finish()
+                },
                 colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF475569))
             ) {
                 Text("Continue as Guest", fontWeight = FontWeight.Medium, fontSize = 14.sp)

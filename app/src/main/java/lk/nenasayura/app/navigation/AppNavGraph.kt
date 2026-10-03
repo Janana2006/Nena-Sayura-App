@@ -1,7 +1,6 @@
 package lk.nenasayura.app.navigation
 
-
-
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,6 +10,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
@@ -57,7 +57,12 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
                 onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
-                onLogin = { navController.navigate(Routes.LOGIN) }
+                onLogin = {
+                    val context = navController.context
+                    val intent = Intent(context, MainActivity::class.java)
+                    context.startActivity(intent)
+                    (context as? android.app.Activity)?.finish()
+                }
             )
         }
 
