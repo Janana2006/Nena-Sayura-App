@@ -1,6 +1,9 @@
 package lk.nenasayura.app.navigation
 
+<<<<<<< Updated upstream
 import android.content.Intent
+=======
+>>>>>>> Stashed changes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,10 +17,12 @@ import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
+import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.student.StudentHomeScreen
+import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
@@ -33,17 +38,24 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     val currentRoute = backStackEntry?.destination?.route
 
     // Keep the visible home in step with the login state:
-    //  - a student who just logged in (or an already restored session) goes to Student Home
+    //  - a student / teacher who just logged in (or an already restored session)
+    //    goes to their own home
     //  - after sign-out the user goes back to Guest Home
     LaunchedEffect(session, currentRoute) {
-        val isStudent = session.isStudent
-        if (isStudent && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
-            navController.navigate(Routes.STUDENT_HOME) {
+        val homeRoute = when {
+            session.isStudent -> Routes.STUDENT_HOME
+            session.isTeacher -> Routes.TEACHER_HOME
+            else -> null
+        }
+        val onRoleHome = currentRoute == Routes.STUDENT_HOME || currentRoute == Routes.TEACHER_HOME
+
+        if (homeRoute != null && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
+            navController.navigate(homeRoute) {
                 popUpTo(Routes.GUEST_HOME) { inclusive = true }
             }
-        } else if (!isStudent && currentRoute == Routes.STUDENT_HOME) {
+        } else if (homeRoute == null && onRoleHome) {
             navController.navigate(Routes.GUEST_HOME) {
-                popUpTo(Routes.STUDENT_HOME) { inclusive = true }
+                popUpTo(currentRoute!!) { inclusive = true }
             }
         }
     }
@@ -76,9 +88,15 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             StudentHomeScreen(onSignOut = { AppSession.provider.signOut() })
         }
 
+        // Teacher module (Step 1: shell with 4 tabs; real screens come in later steps)
+        composable(Routes.TEACHER_HOME) {
+            TeacherHomeScreen(onSignOut = { AppSession.provider.signOut() })
+        }
+
         // Placeholders: each is replaced by a real screen in its own task
         composable(Routes.PAPERS) {
             PapersScreen(onBack = { navController.popBackStack() })
+<<<<<<< Updated upstream
         }  // Task 2
         composable(Routes.MARKING_SCHEMES) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
@@ -88,6 +106,13 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         } // Task 4
         placeholder(Routes.QUIZZES, "Quizzes", navController)                 // Task 5
         placeholder(Routes.SEARCH, "Search", navController)                   // Task 6
+=======
+        }
+        placeholder(Routes.MARKING_SCHEMES, "Marking Schemes", navController)
+        placeholder(Routes.GUIDE_BOOKS, "Guide Books", navController)
+        placeholder(Routes.QUIZZES, "Quizzes", navController)
+        placeholder(Routes.SEARCH, "Search", navController)
+>>>>>>> Stashed changes
     }
 }
 

@@ -8,6 +8,7 @@ object Routes {
     // Home destinations (this module)
     const val GUEST_HOME = "guest_home"
     const val STUDENT_HOME = "student_home"
+    const val TEACHER_HOME = "teacher_home"
 
     // Public resources (available to guests and students)
     const val PAPERS = "papers"
