@@ -25,6 +25,7 @@ import androidx.navigation.NavType
 import androidx.navigation.navArgument
 import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
 import lk.nenasayura.app.ui.guest.quizzes.QuizScreen
+import lk.nenasayura.app.ui.guest.search.SearchScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -101,7 +102,12 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onLogin = { navController.navigate(Routes.LOGIN) }
             )
         } // Task 5
-        placeholder(Routes.SEARCH, "Search", navController)                   // Task 6
+        composable(Routes.SEARCH) {
+            SearchScreen(
+                onBack = { navController.popBackStack() },
+                onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
+            )
+        } // Task 6
     }
 }
 
