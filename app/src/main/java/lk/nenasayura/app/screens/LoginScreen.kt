@@ -33,6 +33,7 @@ fun LoginScreen(
     viewModel: AuthViewModel,
     initialEmail: String = "",
     initialPassword: String = "",
+    showGuestOption: Boolean = true,   // false nam "Continue as Guest" hide wenawa
     onNavigate: (String) -> Unit
 ) {
     var email by remember { mutableStateOf(initialEmail) }
@@ -130,10 +131,11 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Guest
-        // CHANGED: "Home" wenuwata "Guest" (GuestHomeActivity open karanawa)
-        TextButton(onClick = { onNavigate("Guest") }) {
-            Text("Continue as Guest")
+        // Guest: Guest Home eken "Log in" click karala awoth meka hide wenawa
+        if (showGuestOption) {
+            TextButton(onClick = { onNavigate("Guest") }) {
+                Text("Continue as Guest")
+            }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {

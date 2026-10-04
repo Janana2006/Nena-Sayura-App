@@ -9,14 +9,31 @@ import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.repository.SetupRepository
 
 data class SetupUiState(
+    val role: String = "student",
     val loading: Boolean = true,
     val streams: List<StudyStream> = emptyList(),
     val selectedStreamId: String? = null,
-    val selectedSubjectIds: Set<String> = emptySet(),   // ekak witharai thiyenawa
+    val selectedSubjectIds: Set<String> = emptySet(),
     val saving: Boolean = false,
     val error: String? = null,
     val done: Boolean = false
-)
+) {
+    val selectedStream: StudyStream?
+        get() = streams.find { it.id == selectedStreamId }
+
+    // Teacher: subject 1k, Student: subjects 3k
+    val maxSubjects: Int
+        get() = if (role == "teacher") 1 else 3
+
+    // Stream eke subjects 3t wada kamai nam, thiyena okkoma select karanna oni
+    val requiredCount: Int
+        get() = minOf(maxSubjects, selectedStream?.subjects?.size ?: maxSubjects)
+
+    val canConfirm: Boolean
+        get() = selectedStream != null &&
+                requiredCount > 0 &&
+                selectedSubjectIds.size == requiredCount
+}
 
 class SetupViewModel(
     private val repo: SetupRepository = SetupRepository()
@@ -26,8 +43,8 @@ class SetupViewModel(
     val state: StateFlow<SetupUiState> = _state.asStateFlow()
 
     // Screen eka open wena hama welawema fresh start ekak
-    fun start() {
-        _state.value = SetupUiState()
+    fun start(role: String = "teacher") {
+        _state.value = SetupUiState(role = role)
         loadStreams()
     }
 
@@ -47,23 +64,31 @@ class SetupViewModel(
 
     fun selectStream(id: String) {
         if (_state.value.selectedStreamId == id) return
-        // stream wenas unama subject eka clear wenawa
+        // stream wenas unama subjects clear wenawa
         _state.update { it.copy(selectedStreamId = id, selectedSubjectIds = emptySet()) }
     }
 
-    // CHANGED: subject ekak witharai. Aluth ekak select kalama palaweni eka replace wenawa
-    fun selectSubject(id: String) {
-        _state.update { it.copy(selectedSubjectIds = setOf(id)) }
+    fun toggleSubject(id: String) {
+        _state.update { s ->
+            val current = s.selectedSubjectIds
+            val next = when {
+                s.maxSubjects == 1 -> setOf(id)                  // teacher: ekak, aluth ekak select kalama replace wenawa
+                id in current -> current - id                    // untick
+                current.size < s.maxSubjects -> current + id     // student: 3t wada select karanna ba
+                else -> current
+            }
+            s.copy(selectedSubjectIds = next)
+        }
     }
 
     fun confirm() {
         val s = _state.value
-        val stream = s.streams.find { it.id == s.selectedStreamId } ?: return
+        val stream = s.selectedStream ?: return
+        if (!s.canConfirm) return
         val chosen = stream.subjects.filter { it.id in s.selectedSubjectIds }
-        if (chosen.isEmpty()) return
 
         _state.update { it.copy(saving = true, error = null) }
-        repo.saveTeacherSetup(stream, chosen) { result ->
+        repo.saveSetup(s.role, stream, chosen) { result ->
             result.fold(
                 onSuccess = { _state.update { it.copy(saving = false, done = true) } },
                 onFailure = { e ->

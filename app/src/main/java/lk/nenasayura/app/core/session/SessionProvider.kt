@@ -28,7 +28,7 @@ interface SessionProvider {
  * once at app start (for example in MainActivity.onCreate).
  */
 object AppSession {
-    var provider: SessionProvider = DevSessionProvider
+    var provider: SessionProvider = FirebaseSessionProvider
 }
 
 /** Use inside any composable: `val session by currentSession()`. */

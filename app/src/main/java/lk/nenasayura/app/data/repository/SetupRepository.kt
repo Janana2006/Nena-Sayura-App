@@ -63,27 +63,33 @@ class SetupRepository(
         }
     }
 
-    // Teacher ge selection eka save karala setupDone = true karanawa
-    fun saveTeacherSetup(
+    // CHANGED: teacher saha student dekatama (role anuwa) stream/subjects save karala setupDone = true
+    fun saveSetup(
+        role: String,
         stream: StudyStream,
         subjects: List<Subject>,
         onResult: (Result<Unit>) -> Unit
     ) {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
+        val user = auth.currentUser
+        if (user == null) {
             onResult(Result.failure(Exception("Not logged in")))
             return
         }
 
-        val data = mapOf(
+        val data = hashMapOf<String, Any>(
+            "uid" to user.uid,
+            "role" to role,
             "streamId" to stream.id,
             "streamName" to stream.name,
             "subjectIds" to subjects.map { it.id },
             "subjectNames" to subjects.map { it.name },
             "setupDone" to true
         )
+        // Google login wage profile nathi ayata name/email dala thiyaganna
+        user.email?.let { data["email"] = it }
+        user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
 
-        db.collection("users").document(uid).set(data, SetOptions.merge())
+        db.collection("users").document(user.uid).set(data, SetOptions.merge())
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) onResult(Result.success(Unit))
                 else onResult(Result.failure(task.exception ?: Exception("Failed to save")))

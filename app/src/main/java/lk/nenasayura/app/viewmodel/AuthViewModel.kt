@@ -34,6 +34,7 @@ class AuthViewModel(
                         user == null -> "Login"
                         user.role == "teacher" && !user.setupDone -> "TeacherSetup"
                         user.role == "teacher" -> "TeacherHome"
+                        !user.setupDone -> "StudentSetup"   // CHANGED: aluth student ge first-time setup
                         else -> "Home"
                     }
                     onResult(Result.success(route))
@@ -109,7 +110,7 @@ class AuthViewModel(
     private fun friendlyMessage(e: Throwable): String = when (e) {
         is FirebaseAuthInvalidUserException -> "No account found with this email"
         is FirebaseAuthInvalidCredentialsException -> "Incorrect email or password"
-        is FirebaseAuthUserCollisionException -> "An account with this email already exists"
+        is FirebaseAuthUserCollisionException -> "This email is already registered. Please login instead."
         is FirebaseTooManyRequestsException -> "Too many attempts. Please try again later"
         is FirebaseNetworkException -> "No internet connection"
         else -> e.localizedMessage ?: "Something went wrong"

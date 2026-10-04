@@ -34,13 +34,14 @@ class AuthRepository(
         db.collection("users").document(fbUser.uid).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) {
-                    // Google login wage profile nathi ayata: student widihata
+                    // Google login wage profile nathi ayata: student, setup karanna oni
                     onResult(
                         Result.success(
                             User(
                                 uid = fbUser.uid,
                                 name = fbUser.displayName ?: "",
-                                email = fbUser.email ?: ""
+                                email = fbUser.email ?: "",
+                                setupDone = false   // CHANGED
                             )
                         )
                     )
@@ -111,7 +112,7 @@ class AuthRepository(
                         "role" to role,
                         "isFree" to isFree,
                         "fee" to fee,
-                        "setupDone" to (role != "teacher")   // teacher nam false, stream/subject select karanna oni
+                        "setupDone" to false   // CHANGED: teacher saha student dekatama stream/subject select karanna oni
                     )
                     db.collection("users").document(user.uid).set(data)
                         .addOnCompleteListener { saveTask ->

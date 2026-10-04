@@ -19,19 +19,21 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.viewmodel.SetupViewModel
 
 @Composable
-fun TeacherSetupScreen(
+fun SetupScreen(
     modifier: Modifier,
     viewModel: SetupViewModel,
+    role: String,
     onDone: () -> Unit,
     onLogout: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val blue = Color(0xFF0066FF)
+    val isTeacher = role == "teacher"
 
     // Setup iwara karanakan back eken yanna denna epa
     BackHandler(enabled = true) { }
 
-    LaunchedEffect(Unit) { viewModel.start() }
+    LaunchedEffect(role) { viewModel.start(role) }
 
     LaunchedEffect(state.done) {
         if (state.done) {
@@ -40,7 +42,10 @@ fun TeacherSetupScreen(
         }
     }
 
-    val selectedStream = state.streams.find { it.id == state.selectedStreamId }
+    val selectedStream = state.selectedStream
+    val need = state.requiredCount
+    val picked = state.selectedSubjectIds.size
+    val limitReached = !isTeacher && picked >= need
 
     Column(
         modifier = modifier
@@ -49,11 +54,16 @@ fun TeacherSetupScreen(
             .padding(horizontal = 24.dp)
     ) {
         Spacer(modifier = Modifier.height(24.dp))
-        Text("What do you teach?", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = blue)
-        Spacer(modifier = Modifier.height(6.dp))
-        // CHANGED: "subjects" wenuwata "one subject"
         Text(
-            "Select your stream, then choose the one subject you teach.",
+            if (isTeacher) "What do you teach?" else "What are you studying?",
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Bold,
+            color = blue
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            if (isTeacher) "Select your stream, then choose the one subject you teach."
+            else "Select your A/L stream, then choose your 3 subjects.",
             fontSize = 14.sp,
             color = Color.Gray
         )
@@ -99,31 +109,53 @@ fun TeacherSetupScreen(
                     }
                 }
 
-                // ---------- Selected stream eke subjects (ekak witharai select karanna puluwan) ----------
+                // ---------- Selected stream eke subjects ----------
                 if (selectedStream != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Select one subject in ${selectedStream.name}",
+                        if (isTeacher) "Select one subject in ${selectedStream.name}"
+                        else "Select $need subjects in ${selectedStream.name} ($picked/$need)",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                    if (limitReached) {
+                        Text(
+                            "You can select only $need subjects. Untick one to change.",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
                     Spacer(modifier = Modifier.height(8.dp))
 
                     selectedStream.subjects.forEach { subject ->
                         val checked = subject.id in state.selectedSubjectIds
+                        // Student: 3 select kalama anith ewa disable wenawa
+                        val enabled = isTeacher || checked || !limitReached
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.selectSubject(subject.id) }
+                                .clickable(enabled = enabled) { viewModel.toggleSubject(subject.id) }
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // CHANGED: Checkbox wenuwata RadioButton
-                            RadioButton(
-                                selected = checked,
-                                onClick = { viewModel.selectSubject(subject.id) }
+                            if (isTeacher) {
+                                RadioButton(
+                                    selected = checked,
+                                    onClick = { viewModel.toggleSubject(subject.id) }
+                                )
+                            } else {
+                                Checkbox(
+                                    checked = checked,
+                                    onCheckedChange = { viewModel.toggleSubject(subject.id) },
+                                    enabled = enabled
+                                )
+                            }
+                            Text(
+                                subject.name,
+                                fontSize = 16.sp,
+                                color = if (enabled) Color.Unspecified else Color.Gray
                             )
-                            Text(subject.name, fontSize = 16.sp)
                         }
                     }
                 }
@@ -135,10 +167,10 @@ fun TeacherSetupScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Subject ekak select karanakan disabled
+                // Teacher: subject 1k, Student: subjects 3k select karanakan disabled
                 Button(
                     onClick = { viewModel.confirm() },
-                    enabled = state.selectedSubjectIds.isNotEmpty() && !state.saving,
+                    enabled = state.canConfirm && !state.saving,
                     shape = RoundedCornerShape(50),
                     colors = ButtonDefaults.buttonColors(containerColor = blue, contentColor = Color.White),
                     modifier = Modifier.fillMaxWidth().height(52.dp)

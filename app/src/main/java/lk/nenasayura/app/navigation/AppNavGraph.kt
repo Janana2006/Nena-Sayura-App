@@ -41,9 +41,21 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    // CHANGED: "Log in" click kalama oyage real Login screen (MainActivity) ekata yanawa
     val context = LocalContext.current
+
+    // Guest kenek "Log in" click kalama Login screen (MainActivity) ekata yanawa.
+    // EXTRA_FROM_GUEST = true nisa Login screen eke "Continue as Guest" button eka hide wenawa.
     val openRealLogin: () -> Unit = {
+        context.startActivity(
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_FROM_GUEST, true)
+        )
+        (context as? Activity)?.finish()
+    }
+
+    // Sign out kalama Login screen ekata yanawa, mehedi flag eka naha
+    // nisa "Continue as Guest" button eka aye pennanawa.
+    val openLoginAfterSignOut: () -> Unit = {
         context.startActivity(Intent(context, MainActivity::class.java))
         (context as? Activity)?.finish()
     }
@@ -73,7 +85,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
                 onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
-                onLogin = openRealLogin   // CHANGED
+                onLogin = openRealLogin
             )
         }
 
@@ -95,11 +107,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenReminders = { navController.navigate(Routes.REMINDERS) },
                     onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) }
                 ),
-                // CHANGED: sign out kalama Firebase eken logout wela real Login ekata yanawa
+                // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
-                    openRealLogin()
+                    openLoginAfterSignOut()
                 }
             )
         }
@@ -125,7 +137,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         ) {
             QuizScreen(
                 onBack = { navController.popBackStack() },
-                onLogin = openRealLogin   // CHANGED
+                onLogin = openRealLogin
             )
         }
         composable(Routes.SEARCH) {

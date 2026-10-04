@@ -14,21 +14,32 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import lk.nenasayura.app.core.session.AppSession
+import lk.nenasayura.app.core.session.FirebaseSessionProvider
 import lk.nenasayura.app.screens.CheckScreen
 import lk.nenasayura.app.screens.ForgotPasswordScreen
 import lk.nenasayura.app.screens.HomeScreen
 import lk.nenasayura.app.screens.LoginScreen
 import lk.nenasayura.app.screens.RegisterScreen
+import lk.nenasayura.app.screens.SetupScreen
 import lk.nenasayura.app.screens.TeacherHomeScreen
-import lk.nenasayura.app.screens.TeacherSetupScreen
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 import lk.nenasayura.app.viewmodel.AuthViewModel
 import lk.nenasayura.app.viewmodel.SetupViewModel
 
 class MainActivity : ComponentActivity() {
+
+    companion object {
+        // Guest screen eken "Log in" click kara enawa nam true
+        const val EXTRA_FROM_GUEST = "from_guest"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val fromGuest = intent.getBooleanExtra(EXTRA_FROM_GUEST, false)
+
         setContent {
             NenaSayuraAppTheme {
                 val authViewModel: AuthViewModel = viewModel()
@@ -46,10 +57,27 @@ class MainActivity : ComponentActivity() {
                 val navigate: (String) -> Unit = { screen ->
                     if (screen == "Guest") {
                         // Guest: GuestHomeActivity (ui/guest/GuestHomeScreen) open karanna
+                        AppSession.provider.signOut()
                         startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
                         finish()
+                    } else if (screen == "Home") {
+                        // Student login una: session eka set karala Student Home ekata yanna
+                        authViewModel.loadProfile { result ->
+                            val profile = result.getOrNull()
+                            if (profile != null) {
+                                FirebaseSessionProvider.signInStudent(
+                                    uid = profile.uid,
+                                    name = profile.name,
+                                    email = profile.email
+                                )
+                                startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
+                                finish()
+                            } else {
+                                selectScreen = "Login"
+                            }
+                        }
                     } else {
-                        if (screen == "Check" || screen == "Home") {
+                        if (screen == "Check") {
                             prefillEmail = ""
                             prefillPassword = ""
                         }
@@ -66,6 +94,7 @@ class MainActivity : ComponentActivity() {
                             viewModel = authViewModel,
                             initialEmail = prefillEmail,
                             initialPassword = prefillPassword,
+                            showGuestOption = !fromGuest,
                             onNavigate = navigate
                         )
                         "Register" -> RegisterScreen(
@@ -80,15 +109,31 @@ class MainActivity : ComponentActivity() {
                         )
                         "Forgot" -> ForgotPasswordScreen(modifier, authViewModel, navigate)
                         "Check" -> CheckScreen(modifier, authViewModel, navigate)
-                        "TeacherSetup" -> TeacherSetupScreen(
+
+                        // Teacher: stream + subject 1k
+                        "TeacherSetup" -> SetupScreen(
                             modifier = modifier,
                             viewModel = setupViewModel,
+                            role = "teacher",
                             onDone = { selectScreen = "TeacherHome" },
                             onLogout = {
                                 authViewModel.logout()
                                 selectScreen = "Login"
                             }
                         )
+
+                        // Student: stream + subjects 3k
+                        "StudentSetup" -> SetupScreen(
+                            modifier = modifier,
+                            viewModel = setupViewModel,
+                            role = "student",
+                            onDone = { navigate("Home") },
+                            onLogout = {
+                                authViewModel.logout()
+                                selectScreen = "Login"
+                            }
+                        )
+
                         "TeacherHome" -> TeacherHomeScreen(modifier, authViewModel, navigate)
                         "Home" -> HomeScreen(modifier, authViewModel, navigate)
                     }
