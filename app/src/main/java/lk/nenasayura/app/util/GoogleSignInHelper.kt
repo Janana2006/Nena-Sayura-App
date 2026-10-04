@@ -1,15 +1,17 @@
 package lk.nenasayura.app.util
 
 import android.content.Context
+import android.util.Log
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import lk.nenasayura.app.R
 
 object GoogleSignInHelper {
-
 
     suspend fun getIdToken(context: Context): Result<String> {
         return try {
@@ -31,7 +33,16 @@ object GoogleSignInHelper {
             } else {
                 Result.failure(Exception("Unexpected credential type"))
             }
+        } catch (e: GetCredentialCancellationException) {
+            // User chooser eka close kala, ho setup eke prashnayak
+            Log.e("GoogleSignIn", "Cancelled", e)
+            Result.failure(Exception("Google sign-in was cancelled"))
+        } catch (e: NoCredentialException) {
+            // Phone eke Google account ekak naha
+            Log.e("GoogleSignIn", "No credential", e)
+            Result.failure(Exception("No Google account found on this phone. Add one in Settings and try again."))
         } catch (e: Exception) {
+            Log.e("GoogleSignIn", "Failed", e)
             Result.failure(e)
         }
     }
