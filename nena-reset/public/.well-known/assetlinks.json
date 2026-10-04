@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "lk.nenasayura.app",
+      "sha256_cert_fingerprints": [
+        "7A:40:4B:71:3E:3F:F8:15:3A:E2:CA:6B:DB:7D:46:3B:6A:01:80:B6:BD:61:34:B7:B4:04:34:1B:69:99:EC:34"
+      ]
+    }
+  }
+]

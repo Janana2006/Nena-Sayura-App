@@ -1,6 +1,7 @@
 package lk.nenasayura.app
 
 import android.content.Intent
+import android.util.Log
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -8,7 +9,10 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -21,6 +25,8 @@ import lk.nenasayura.app.screens.ForgotPasswordScreen
 import lk.nenasayura.app.screens.HomeScreen
 import lk.nenasayura.app.screens.LoginScreen
 import lk.nenasayura.app.screens.RegisterScreen
+import lk.nenasayura.app.screens.ResetPasswordScreen
+import lk.nenasayura.app.screens.RoleSelectScreen   // NEW
 import lk.nenasayura.app.screens.SetupScreen
 import lk.nenasayura.app.screens.TeacherHomeScreen
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
@@ -34,20 +40,59 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_GUEST = "from_guest"
     }
 
+    // reset link eken awa code eka. State ekak widiyata thiyenne, app eka open ekama
+    // thiyenakota link ekak awath screen eka ResetPassword ekata wenas wenna
+    private var resetCode by mutableStateOf<String?>(null)
+
+    // reset link ekak awama hama parakma wenas wenawa (same code eka aye awath screen eka wenas wenna)
+    private var resetNonce by mutableIntStateOf(0)
+
+    // Reset password link eken app eka open una nam oobCode eka gannawa
+    private fun resetCodeFrom(intent: Intent?): String? {
+        val uri = intent?.data ?: return null
+        if (uri.path?.startsWith("/__/auth/action") != true) return null
+        if (uri.getQueryParameter("mode") != "resetPassword") return null
+        return uri.getQueryParameter("oobCode")
+    }
+
+    // app eka already open wela thiyenakota link ekak awoth meka run wenawa
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        Log.d("ResetLink", "onNewIntent mode=${intent.data?.getQueryParameter("mode")} hasCode=${resetCodeFrom(intent) != null}")
+        setIntent(intent)
+        resetCodeFrom(intent)?.let {
+            resetCode = it
+            resetNonce++
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
         val fromGuest = intent.getBooleanExtra(EXTRA_FROM_GUEST, false)
+        Log.d("ResetLink", "onCreate mode=${intent.data?.getQueryParameter("mode")} hasCode=${resetCodeFrom(intent) != null}")
+        resetCode = resetCodeFrom(intent)
 
         setContent {
             NenaSayuraAppTheme {
                 val authViewModel: AuthViewModel = viewModel()
                 val setupViewModel: SetupViewModel = viewModel()
 
-                // kalin login wela nam role/setup check karanna "Check" ekata
+                // Reset link eken awoth ResetPassword, kalin login wela nam Check, nathnam Login
                 var selectScreen by remember {
-                    mutableStateOf(if (authViewModel.isLoggedIn()) "Check" else "Login")
+                    mutableStateOf(
+                        when {
+                            resetCode != null -> "ResetPassword"
+                            authViewModel.isLoggedIn() -> "Check"
+                            else -> "Login"
+                        }
+                    )
+                }
+
+                // app eka open wela thiyenakota aluth reset link ekak awoth screen eka wenas karanawa
+                LaunchedEffect(resetCode, resetNonce) {
+                    if (resetCode != null) selectScreen = "ResetPassword"
                 }
 
                 // Register una passe Login page ekata yawana email/password
@@ -108,7 +153,29 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                         "Forgot" -> ForgotPasswordScreen(modifier, authViewModel, navigate)
+                        // key(resetNonce) - aluth link ekak awoth screen eka mulinma aye check karanawa
+                        "ResetPassword" -> key(resetNonce) {
+                            ResetPasswordScreen(
+                                modifier = modifier,
+                                viewModel = authViewModel,
+                                code = resetCode ?: "",
+                                onNavigate = navigate
+                            )
+                        }
                         "Check" -> CheckScreen(modifier, authViewModel, navigate)
+
+                        // NEW: Google wage aluth user: Student da Teacher da kiyala ahanawa
+                        "RoleSelect" -> RoleSelectScreen(
+                            modifier = modifier,
+                            viewModel = authViewModel,
+                            onContinue = { role ->
+                                selectScreen = if (role == "teacher") "TeacherSetup" else "StudentSetup"
+                            },
+                            onLogout = {
+                                authViewModel.logout()
+                                selectScreen = "Login"
+                            }
+                        )
 
                         // Teacher: stream + subject 1k
                         "TeacherSetup" -> SetupScreen(

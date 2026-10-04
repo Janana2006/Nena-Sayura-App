@@ -21,18 +21,32 @@ data class SetupUiState(
     val selectedStream: StudyStream?
         get() = streams.find { it.id == selectedStreamId }
 
+    // Student + stream ekata groups (slots) thiyenawa nam slots widihata select karanawa
+    val hasGroups: Boolean
+        get() = role != "teacher" && selectedStream?.groups?.isNotEmpty() == true
+
     // Teacher: subject 1k, Student: subjects 3k
     val maxSubjects: Int
         get() = if (role == "teacher") 1 else 3
 
-    // Stream eke subjects 3t wada kamai nam, thiyena okkoma select karanna oni
+    // Slots nathi stream walata: subjects 3t wada kamai nam thiyena okkoma select karanna oni
     val requiredCount: Int
-        get() = minOf(maxSubjects, selectedStream?.subjects?.size ?: maxSubjects)
+        get() = if (hasGroups) {
+            selectedStream?.groups?.size ?: 0
+        } else {
+            minOf(maxSubjects, selectedStream?.subjects?.size ?: maxSubjects)
+        }
 
     val canConfirm: Boolean
-        get() = selectedStream != null &&
-                requiredCount > 0 &&
-                selectedSubjectIds.size == requiredCount
+        get() {
+            val stream = selectedStream ?: return false
+            return if (hasGroups) {
+                // hama slot ekakama select karala thiyenna oni
+                stream.groups.all { group -> group.any { it.id in selectedSubjectIds } }
+            } else {
+                requiredCount > 0 && selectedSubjectIds.size == requiredCount
+            }
+        }
 }
 
 class SetupViewModel(
@@ -64,17 +78,42 @@ class SetupViewModel(
 
     fun selectStream(id: String) {
         if (_state.value.selectedStreamId == id) return
-        // stream wenas unama subjects clear wenawa
-        _state.update { it.copy(selectedStreamId = id, selectedSubjectIds = emptySet()) }
+
+        _state.update { s ->
+            val stream = s.streams.find { it.id == id }
+            // Compulsory subjects (option 1k thiyena slots) kalinma select karanawa
+            val preselected = if (s.role != "teacher" && stream != null) {
+                stream.groups
+                    .filter { it.size == 1 }
+                    .map { it.first().id }
+                    .toSet()
+            } else {
+                emptySet()
+            }
+            s.copy(selectedStreamId = id, selectedSubjectIds = preselected)
+        }
     }
 
     fun toggleSubject(id: String) {
         _state.update { s ->
             val current = s.selectedSubjectIds
             val next = when {
-                s.maxSubjects == 1 -> setOf(id)                  // teacher: ekak, aluth ekak select kalama replace wenawa
-                id in current -> current - id                    // untick
-                current.size < s.maxSubjects -> current + id     // student: 3t wada select karanna ba
+                // Teacher: ekak, aluth ekak select kalama replace wenawa
+                s.maxSubjects == 1 -> setOf(id)
+
+                // Student + slots
+                s.hasGroups -> {
+                    val group = s.selectedStream?.groups?.firstOrNull { g -> g.any { it.id == id } }
+                    when {
+                        group == null -> current
+                        group.size == 1 -> current                                // compulsory, wenas karanna ba
+                        else -> (current - group.map { it.id }.toSet()) + id      // slot eke palaweni eka ain wela aluth eka
+                    }
+                }
+
+                // Student + slots nathi stream: 3t wada select karanna ba
+                id in current -> current - id
+                current.size < s.maxSubjects -> current + id
                 else -> current
             }
             s.copy(selectedSubjectIds = next)
@@ -85,7 +124,13 @@ class SetupViewModel(
         val s = _state.value
         val stream = s.selectedStream ?: return
         if (!s.canConfirm) return
-        val chosen = stream.subjects.filter { it.id in s.selectedSubjectIds }
+
+        // Slots thiyenawa nam slot order eken (Subject 1, 2, 3)
+        val chosen = if (s.hasGroups) {
+            stream.groups.mapNotNull { group -> group.firstOrNull { it.id in s.selectedSubjectIds } }
+        } else {
+            stream.subjects.filter { it.id in s.selectedSubjectIds }
+        }
 
         _state.update { it.copy(saving = true, error = null) }
         repo.saveSetup(s.role, stream, chosen) { result ->

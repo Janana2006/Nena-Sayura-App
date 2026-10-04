@@ -11,20 +11,37 @@ class SetupRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    // streams collection eken okkoma streams + subjects
+    // streams collection eken okkoma streams + subjects + groups
     fun getStreams(onResult: (Result<List<StudyStream>>) -> Unit) {
         db.collection("streams").orderBy("order").get()
             .addOnSuccessListener { snapshot ->
                 val list = snapshot.documents.map { doc ->
+                    val subjects = parseSubjects(doc.get("subjects"))
                     StudyStream(
                         id = doc.id,
                         name = doc.getString("name") ?: doc.id,
-                        subjects = parseSubjects(doc.get("subjects"))
+                        subjects = subjects,
+                        groups = parseGroups(doc.get("groups"), subjects)
                     )
                 }
                 onResult(Result.success(list))
             }
             .addOnFailureListener { onResult(Result.failure(it)) }
+    }
+
+    // groups = ["combined_maths", "physics", "chemistry|ict"]
+    // Hama string ekakama slot ekak, "|" eken options wen karanawa
+    private fun parseGroups(raw: Any?, subjects: List<Subject>): List<List<Subject>> {
+        val items = raw as? List<*> ?: return emptyList()
+        val byId = subjects.associateBy { it.id }
+
+        return items.mapNotNull { item ->
+            val text = item as? String ?: return@mapNotNull null
+            val options = text.split("|")
+                .map { it.trim() }
+                .mapNotNull { id -> byId[id] }
+            if (options.isEmpty()) null else options
+        }
     }
 
     // subjects format 2kama handle karanawa
@@ -63,7 +80,7 @@ class SetupRepository(
         }
     }
 
-    // CHANGED: teacher saha student dekatama (role anuwa) stream/subjects save karala setupDone = true
+    // teacher saha student dekatama (role anuwa) stream/subjects save karala setupDone = true
     fun saveSetup(
         role: String,
         stream: StudyStream,
@@ -85,7 +102,6 @@ class SetupRepository(
             "subjectNames" to subjects.map { it.name },
             "setupDone" to true
         )
-        // Google login wage profile nathi ayata name/email dala thiyaganna
         user.email?.let { data["email"] = it }
         user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
 
