@@ -51,8 +51,9 @@ fun TeacherSetupScreen(
         Spacer(modifier = Modifier.height(24.dp))
         Text("What do you teach?", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = blue)
         Spacer(modifier = Modifier.height(6.dp))
+        // CHANGED: "subjects" wenuwata "one subject"
         Text(
-            "Select your stream, then choose the subjects you teach.",
+            "Select your stream, then choose the one subject you teach.",
             fontSize = 14.sp,
             color = Color.Gray
         )
@@ -98,11 +99,11 @@ fun TeacherSetupScreen(
                     }
                 }
 
-                // ---------- Selected stream eke subjects ----------
+                // ---------- Selected stream eke subjects (ekak witharai select karanna puluwan) ----------
                 if (selectedStream != null) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "Subjects in ${selectedStream.name}",
+                        "Select one subject in ${selectedStream.name}",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -113,13 +114,14 @@ fun TeacherSetupScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { viewModel.toggleSubject(subject.id) }
+                                .clickable { viewModel.selectSubject(subject.id) }
                                 .padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Checkbox(
-                                checked = checked,
-                                onCheckedChange = { viewModel.toggleSubject(subject.id) }
+                            // CHANGED: Checkbox wenuwata RadioButton
+                            RadioButton(
+                                selected = checked,
+                                onClick = { viewModel.selectSubject(subject.id) }
                             )
                             Text(subject.name, fontSize = 16.sp)
                         }
@@ -133,7 +135,7 @@ fun TeacherSetupScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Subject ekak hari select karanakan disabled
+                // Subject ekak select karanakan disabled
                 Button(
                     onClick = { viewModel.confirm() },
                     enabled = state.selectedSubjectIds.isNotEmpty() && !state.saving,

@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
 
                 val navigate: (String) -> Unit = { screen ->
                     if (screen == "Guest") {
-                        // CHANGED: Guest nam ui/guest/GuestHomeScreen eka open karanna
+                        // Guest: GuestHomeActivity (ui/guest/GuestHomeScreen) open karanna
                         startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
                         finish()
                     } else {

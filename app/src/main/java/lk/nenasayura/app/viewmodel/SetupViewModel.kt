@@ -12,7 +12,7 @@ data class SetupUiState(
     val loading: Boolean = true,
     val streams: List<StudyStream> = emptyList(),
     val selectedStreamId: String? = null,
-    val selectedSubjectIds: Set<String> = emptySet(),
+    val selectedSubjectIds: Set<String> = emptySet(),   // ekak witharai thiyenawa
     val saving: Boolean = false,
     val error: String? = null,
     val done: Boolean = false
@@ -47,15 +47,13 @@ class SetupViewModel(
 
     fun selectStream(id: String) {
         if (_state.value.selectedStreamId == id) return
-        // stream wenas unama subjects clear wenawa
+        // stream wenas unama subject eka clear wenawa
         _state.update { it.copy(selectedStreamId = id, selectedSubjectIds = emptySet()) }
     }
 
-    fun toggleSubject(id: String) {
-        _state.update {
-            val current = it.selectedSubjectIds
-            it.copy(selectedSubjectIds = if (id in current) current - id else current + id)
-        }
+    // CHANGED: subject ekak witharai. Aluth ekak select kalama palaweni eka replace wenawa
+    fun selectSubject(id: String) {
+        _state.update { it.copy(selectedSubjectIds = setOf(id)) }
     }
 
     fun confirm() {
