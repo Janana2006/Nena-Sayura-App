@@ -190,7 +190,23 @@ fun RegisterScreen(
 
                     Text("I am a", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
                     Spacer(modifier = Modifier.height(8.dp))
-                    RoleSelector(role = role, onRoleChange = { role = it })
+
+                    // CHANGED: role eka wenas karanakota form eka clear karanawa
+                    RoleSelector(
+                        role = role,
+                        onRoleChange = { newRole ->
+                            if (newRole != role) {
+                                role = newRole
+                                name = ""
+                                email = ""
+                                password = ""
+                                confirm = ""
+                                showPassword = false
+                                isFree = true
+                                feeText = ""
+                            }
+                        }
+                    )
                     Spacer(modifier = Modifier.height(20.dp))
 
                     OutlinedTextField(
@@ -210,21 +226,27 @@ fun RegisterScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    // CHANGED: password walata space type karanna ba (false "Passwords do not match" nathi wenna)
                     OutlinedTextField(
-                        value = password, onValueChange = { password = it },
+                        value = password,
+                        onValueChange = { password = it.filter { c -> !c.isWhitespace() } },
                         label = { Text("Password") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         trailingIcon = eyeButton,
                         visualTransformation = passwordTransformation,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true, shape = fieldShape, colors = fieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = confirm, onValueChange = { confirm = it },
+                        value = confirm,
+                        onValueChange = { confirm = it.filter { c -> !c.isWhitespace() } },
                         label = { Text("Confirm password") },
                         leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                         visualTransformation = passwordTransformation,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         singleLine = true, shape = fieldShape, colors = fieldColors,
                         modifier = Modifier.fillMaxWidth()
                     )
