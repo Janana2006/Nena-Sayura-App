@@ -80,15 +80,13 @@ class AuthViewModel(
         _state.value = AuthUiState.Loading
         repo.register(name.trim(), email.trim(), password, role, free, fee) { handle(it) }
     }
-
-    // NEW: RoleSelect page eken role eka (saha teacher nam Free/Paid + fee) save karanawa
+GIT
     fun saveRole(
         role: String,
         isFree: Boolean,
         feeText: String,
         onResult: (Result<Unit>) -> Unit
     ) {
-        // Teacher kenek Paid select kalama fee eka check karanna
         val free = role != "teacher" || isFree
         var fee = 0
         if (!free) {
