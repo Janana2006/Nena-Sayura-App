@@ -30,6 +30,12 @@ import lk.nenasayura.app.ui.guest.quizzes.QuizScreen
 import lk.nenasayura.app.ui.guest.search.SearchScreen
 import lk.nenasayura.app.ui.student.StudentHomeActions
 import lk.nenasayura.app.ui.student.StudentHomeScreen
+import lk.nenasayura.app.ui.guest.papers.PaperCategoriesScreen
+import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
+import lk.nenasayura.app.ui.student.QuickAccessScreen
+import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
+import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -105,7 +111,10 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenTeachers = { navController.navigate(Routes.TEACHERS) },
                     onOpenTimetable = { navController.navigate(Routes.TIMETABLE) },
                     onOpenReminders = { navController.navigate(Routes.REMINDERS) },
-                    onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) }
+                    onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
+                    onOpenQuickAccess = { navController.navigate(Routes.QUICK_ACCESS) },
+                    onOpenReviews = { navController.navigate(Routes.REVIEWS) },
+                    onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
                 ),
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
@@ -117,12 +126,43 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Routes.PAPERS) {
+            PaperCategoriesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenCategory = { category -> navController.navigate(Routes.papersRoute(category)) }
+            )
+        }
+        composable(
+            route = Routes.PAPERS_LIST,
+            arguments = listOf(navArgument("category") { type = NavType.StringType })
+        ) {
             PapersScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.MARKING_SCHEMES) {
+            MarkingSchemeCategoriesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenCategory = { category ->
+                    navController.navigate(Routes.markingSchemesRoute(category))
+                }
+            )
+        }
+        composable(
+            route = Routes.MARKING_SCHEMES_LIST,
+            arguments = listOf(navArgument("category") { type = NavType.StringType })
+        ) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.GUIDE_BOOKS) {
+            GuideBookCategoriesScreen(
+                onBack = { navController.popBackStack() },
+                onOpenCategory = { category ->
+                    navController.navigate(Routes.guideBooksRoute(category))
+                }
+            )
+        }
+        composable(
+            route = Routes.GUIDE_BOOKS_LIST,
+            arguments = listOf(navArgument("category") { type = NavType.StringType })
+        ) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.QUIZZES) {
@@ -146,7 +186,26 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
             )
         }
-
+        composable(Routes.QUICK_ACCESS) {
+            QuickAccessScreen(
+                onBack = { navController.popBackStack() },
+                onOpenPapers = { navController.navigate(Routes.PAPERS) },
+                onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
+                onOpenTimetable = { navController.navigate(Routes.TIMETABLE) },
+                onOpenReminders = { navController.navigate(Routes.REMINDERS) },
+                onOpenMarkingSchemes = { navController.navigate(Routes.MARKING_SCHEMES) },
+                onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) }
+            )
+        }
+        composable(Routes.REVIEWS) {
+            AllReviewsScreen(
+                onBack = { navController.popBackStack() },
+                onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
+            )
+        }
+        composable(Routes.WRITE_REVIEW) {
+            WriteReviewScreen(onBack = { navController.popBackStack() })
+        }
         // Student-only screens: each is replaced by a real screen in its own task
         placeholder(Routes.TEACHERS, "Teachers", navController)
         placeholder(Routes.TIMETABLE, "Timetable", navController)

@@ -11,8 +11,14 @@ object Routes {
 
     // Public resources (available to guests and students)
     const val PAPERS = "papers"
+    const val PAPERS_LIST = "papers/{category}"
+    fun papersRoute(category: String) = "papers/$category"
     const val MARKING_SCHEMES = "marking_schemes"
+    const val MARKING_SCHEMES_LIST = "marking_schemes/{category}"
+    fun markingSchemesRoute(category: String) = "marking_schemes/$category"
     const val GUIDE_BOOKS = "guide_books"
+    const val GUIDE_BOOKS_LIST = "guide_books/{category}"
+    fun guideBooksRoute(category: String) = "guide_books/$category"
     const val QUIZZES = "quizzes"
     const val QUIZ_PLAY = "quiz/{quizId}"
     fun quizRoute(quizId: String) = "quiz/$quizId"
@@ -22,5 +28,8 @@ object Routes {
     const val TIMETABLE = "timetable"
     const val REMINDERS = "reminders"
     const val ANALYTICS = "analytics"
+    const val QUICK_ACCESS = "quick_access"
+    const val REVIEWS = "reviews"
+    const val WRITE_REVIEW = "write_review"
     const val SEARCH = "search"
 }
