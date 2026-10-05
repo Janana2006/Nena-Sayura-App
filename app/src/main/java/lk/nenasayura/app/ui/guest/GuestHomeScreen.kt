@@ -1,7 +1,6 @@
 package lk.nenasayura.app.ui.guest
 
-
-
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,30 +19,34 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.MenuBook
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Quiz
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,30 +55,48 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import lk.nenasayura.app.ui.common.LoginRequiredDialog
-import lk.nenasayura.app.ui.theme.NenaAccentContainer
+import lk.nenasayura.app.ui.common.NenaTopBar
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaAccent
+import lk.nenasayura.app.ui.theme.NenaIconColors
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
-
-private val LockedIconColor = Color(0xFF8A5A00)
 
 private data class ResourceItem(
     val title: String,
     val subtitle: String,
     val icon: ImageVector,
+    val palette: IconPalette,
     val onClick: () -> Unit
 )
 
-private data class LockedItem(
+/** The four bottom tabs. Only Home is open to guests. */
+private enum class GuestTab(
+    val label: String,
     val title: String,
-    val description: String,
-    val icon: ImageVector
-)
+    val icon: ImageVector,
+    val locked: Boolean,
+    val benefit: String
+) {
+    Home("Home", "Home", Icons.Filled.Home, false, ""),
+    Resources(
+        "Resources", "Resources", Icons.AutoMirrored.Filled.LibraryBooks, true,
+        "all your study resources in one place"
+    ),
+    Study(
+        "Study", "Study Tools", Icons.Filled.CalendarMonth, true,
+        "your teachers, timetable, reminders and study progress"
+    ),
+    Profile(
+        "Profile", "Profile", Icons.Filled.Person, true,
+        "your profile and account"
+    )
+}
 
 /**
  * Home page for users who are not logged in.
- * Free resources open directly; student-only features ask the guest to log in.
+ * Home shows the free resources; Resources, Study and Profile ask the guest to log in.
  */
 @Composable
 fun GuestHomeScreen(
@@ -86,79 +107,112 @@ fun GuestHomeScreen(
     onOpenSearch: () -> Unit,
     onLogin: () -> Unit
 ) {
-    // Name of the locked feature the guest tapped (null = dialog hidden)
-    var lockedFeature by remember { mutableStateOf<String?>(null) }
+    // Saved as a number so the selected tab survives opening another screen and coming back
+    var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+    val selectedTab = GuestTab.entries[selectedIndex]
+
+    // Back from a locked tab returns to the Home tab first
+    BackHandler(enabled = selectedTab != GuestTab.Home) { selectedIndex = 0 }
 
     val resources = listOf(
-        ResourceItem("Papers", "Past & model papers", Icons.Filled.Description, onOpenPapers),
-        ResourceItem("Marking Schemes", "Check your answers", Icons.Filled.FactCheck, onOpenMarkingSchemes),
-        ResourceItem("Quizzes", "Practice with MCQs", Icons.Filled.Quiz, onOpenQuizzes),
-        ResourceItem("Guide Books", "Teacher guides & books", Icons.AutoMirrored.Filled.MenuBook, onOpenGuideBooks)
+        ResourceItem("Papers", "Past & model papers", Icons.Filled.Description, NenaIconColors.Papers, onOpenPapers),
+        ResourceItem("Marking Schemes", "Check your answers", Icons.Filled.FactCheck, NenaIconColors.MarkingSchemes, onOpenMarkingSchemes),
+        ResourceItem("Quizzes", "Practice with MCQs", Icons.Filled.Quiz, NenaIconColors.Quizzes, onOpenQuizzes),
+        ResourceItem("Guide Books", "Teacher guides & books", Icons.AutoMirrored.Filled.MenuBook, NenaIconColors.GuideBooks, onOpenGuideBooks)
     )
 
-    val lockedItems = listOf(
-        LockedItem("Choose a teacher", "Notes, model papers and study videos", Icons.Filled.School),
-        LockedItem("Timetable", "Plan your weekly classes", Icons.Filled.CalendarMonth),
-        LockedItem("Reminders", "Never miss a study session or exam", Icons.Filled.Notifications),
-        LockedItem("Study analytics", "Track your quiz progress", Icons.Filled.BarChart)
-    )
-
-    Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
-                .verticalScroll(rememberScrollState())
-        ) {
-            GuestHeader(onLogin = onLogin, onOpenSearch = onOpenSearch)
-
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-                SectionTitle(title = "Free study resources", subtitle = "")
-                Spacer(modifier = Modifier.height(12.dp))
-
-                resources.chunked(2).forEach { rowItems ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        rowItems.forEach { item ->
-                            ResourceCard(item = item, modifier = Modifier.weight(1f))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-                SectionTitle(title = "More with a student account", subtitle = "Log in to unlock")
-                Spacer(modifier = Modifier.height(12.dp))
-
-                lockedItems.forEach { item ->
-                    LockedCard(item = item, onClick = { lockedFeature = item.title })
-                    Spacer(modifier = Modifier.height(10.dp))
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = onLogin,
-                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                    shape = RoundedCornerShape(14.dp)
-                ) {
-                    Text("Log in or register")
-                }
-                Spacer(modifier = Modifier.height(24.dp))
+    Scaffold(
+        topBar = {
+            // The Home tab draws its own gradient header
+            if (selectedTab != GuestTab.Home) {
+                NenaTopBar(title = selectedTab.title)
             }
+        },
+        bottomBar = {
+            GuestBottomBar(
+                selectedIndex = selectedIndex,
+                onTabSelected = { selectedIndex = it }
+            )
+        },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        if (selectedTab == GuestTab.Home) {
+            // Home goes edge to edge at the top, so only the bottom padding is applied
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = innerPadding.calculateBottomPadding())
+                    .verticalScroll(rememberScrollState())
+            ) {
+                GuestHeader(onLogin = onLogin, onOpenSearch = onOpenSearch)
+
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
+                    SectionTitle(title = "Free study resources", subtitle = "")
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    resources.chunked(2).forEach { rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            rowItems.forEach { item ->
+                                ResourceCard(item = item, modifier = Modifier.weight(1f))
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
+            }
+        } else {
+            GuestLockedTab(
+                featureName = selectedTab.title,
+                benefit = selectedTab.benefit,
+                onLogin = onLogin,
+                modifier = Modifier.padding(innerPadding)
+            )
         }
     }
+}
 
-    lockedFeature?.let { feature ->
-        LoginRequiredDialog(
-            featureName = feature,
-            onDismiss = { lockedFeature = null },
-            onLogin = {
-                lockedFeature = null
-                onLogin()
-            }
-        )
+/** Same look as the Student Home bottom bar; locked tabs carry a small lock badge. */
+@Composable
+private fun GuestBottomBar(selectedIndex: Int, onTabSelected: (Int) -> Unit) {
+    NavigationBar {
+        GuestTab.entries.forEachIndexed { index, tab ->
+            NavigationBarItem(
+                selected = index == selectedIndex,
+                onClick = { onTabSelected(index) },
+                icon = {
+                    if (tab.locked) {
+                        BadgedBox(
+                            badge = {
+                                Badge(containerColor = NenaAccent) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Lock,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(9.dp),
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = tab.icon,
+                                contentDescription = "${tab.label} (login required)"
+                            )
+                        }
+                    } else {
+                        Icon(imageVector = tab.icon, contentDescription = tab.label)
+                    }
+                },
+                label = { Text(tab.label) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = NenaPrimary,
+                    selectedTextColor = NenaPrimary,
+                    indicatorColor = NenaPrimaryContainer
+                )
+            )
+        }
     }
 }
 
@@ -217,7 +271,7 @@ private fun GuestHeader(onLogin: () -> Unit, onOpenSearch: () -> Unit) {
             )
 
             Spacer(modifier = Modifier.height(20.dp))
-            // Looks like a search bar; tapping opens the Search screen (Task 6)
+            // Looks like a search bar; tapping opens the Search screen
             Surface(
                 onClick = onOpenSearch,
                 modifier = Modifier.fillMaxWidth(),
@@ -274,10 +328,10 @@ private fun ResourceCard(item: ResourceItem, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(NenaPrimaryContainer, CircleShape),
+                    .background(item.palette.container, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = item.icon, contentDescription = null, tint = NenaPrimary)
+                Icon(imageVector = item.icon, contentDescription = null, tint = item.palette.tint)
             }
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -289,49 +343,6 @@ private fun ResourceCard(item: ResourceItem, modifier: Modifier = Modifier) {
                 text = item.subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-@Composable
-private fun LockedCard(item: LockedItem, onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(NenaAccentContainer, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(imageVector = item.icon, contentDescription = null, tint = LockedIconColor)
-            }
-            Spacer(modifier = Modifier.width(14.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = item.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = item.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = Icons.Filled.Lock,
-                contentDescription = "Login required",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
