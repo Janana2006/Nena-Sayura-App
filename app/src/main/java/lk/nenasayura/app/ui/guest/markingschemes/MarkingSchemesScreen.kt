@@ -34,6 +34,7 @@ import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.data.model.markingSchemeCategoryTitle
 
 /** Lists marking schemes with filters. Works for guests and logged-in students. */
 @Composable
@@ -45,9 +46,10 @@ fun MarkingSchemesScreen(
     val context = LocalContext.current
     val errorMessage = state.errorMessage
     val visibleSchemes = state.filteredSchemes
+    val categoryTitle = markingSchemeCategoryTitle(viewModel.category)
 
     Scaffold(
-        topBar = { NenaTopBar(title = "Marking Schemes", onBack = onBack) },
+        topBar = { NenaTopBar(title = categoryTitle, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -63,7 +65,9 @@ fun MarkingSchemesScreen(
                     onRetry = viewModel::load
                 )
 
-                state.schemes.isEmpty() -> EmptyView(message = "No marking schemes are available yet.")
+                state.schemes.isEmpty() -> EmptyView(
+                    message = "No ${categoryTitle.lowercase()} are available yet."
+                )
 
                 else -> {
                     OutlinedTextField(
@@ -72,7 +76,7 @@ fun MarkingSchemesScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        placeholder = { Text("Search by title or subject") },
+                        placeholder = { Text("Search ${categoryTitle.lowercase()}") },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         trailingIcon = {
                             if (state.query.isNotEmpty()) {

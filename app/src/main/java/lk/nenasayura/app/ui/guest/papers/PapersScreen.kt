@@ -35,6 +35,7 @@ import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.data.model.paperCategoryTitle
 
 /** Lists A/L papers with filters. Works for guests and logged-in students. */
 @Composable
@@ -46,9 +47,10 @@ fun PapersScreen(
     val context = LocalContext.current
     val errorMessage = state.errorMessage
     val visiblePapers = state.filteredPapers
+    val categoryTitle = paperCategoryTitle(viewModel.category)
 
     Scaffold(
-        topBar = { NenaTopBar(title = "Papers", onBack = onBack) },
+        topBar = { NenaTopBar(title = categoryTitle, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -64,7 +66,9 @@ fun PapersScreen(
                     onRetry = viewModel::load
                 )
 
-                state.papers.isEmpty() -> EmptyView(message = "No papers are available yet.")
+                state.papers.isEmpty() -> EmptyView(
+                    message = "No ${categoryTitle.lowercase()} are available yet."
+                )
 
                 else -> {
                     OutlinedTextField(
@@ -73,7 +77,7 @@ fun PapersScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        placeholder = { Text("Search by title or subject") },
+                        placeholder = { Text("Search ${categoryTitle.lowercase()}") },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         trailingIcon = {
                             if (state.query.isNotEmpty()) {
@@ -86,15 +90,8 @@ fun PapersScreen(
                         shape = RoundedCornerShape(14.dp)
                     )
 
-                    if (state.availableTypes.isNotEmpty()) {
-                        FilterChipRow(
-                            label = "Paper type",
-                            options = state.availableTypes,
-                            selected = state.selectedType,
-                            optionLabel = { paperTypeLabel(it) },
-                            onSelected = viewModel::onTypeSelected
-                        )
-                    }
+
+
                     if (state.availableSubjects.isNotEmpty()) {
                         FilterChipRow(
                             label = "Subject",

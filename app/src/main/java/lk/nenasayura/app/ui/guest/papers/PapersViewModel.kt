@@ -16,6 +16,8 @@ import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.PaperRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
+import androidx.lifecycle.SavedStateHandle
+import lk.nenasayura.app.data.model.isInCategory
 
 /** Everything the Papers screen needs to draw itself. */
 data class PapersUiState(
@@ -62,10 +64,13 @@ data class PapersUiState(
         }
 }
 
-class PapersViewModel(
-    private val paperRepository: PaperRepository = PaperRepository(),
-    private val subjectRepository: SubjectRepository = SubjectRepository()
-) : ViewModel() {
+class PapersViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
+
+    // "past", "model" or "provincial" (the navigation argument)
+    val category: String = savedStateHandle.get<String>("category") ?: "past"
+
+    private val paperRepository = PaperRepository()
+    private val subjectRepository = SubjectRepository()
 
     private val _uiState = MutableStateFlow(PapersUiState())
     val uiState: StateFlow<PapersUiState> = _uiState.asStateFlow()
@@ -85,7 +90,12 @@ class PapersViewModel(
                     papersJob.await() to subjectsJob.await()
                 }
                 _uiState.update {
-                    it.copy(isLoading = false, papers = papers, subjects = subjects)
+                    it.copy(
+                        isLoading = false,
+                        // Keep only the papers of the chosen category
+                        papers = papers.filter { paper -> paper.isInCategory(category) },
+                        subjects = subjects
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
