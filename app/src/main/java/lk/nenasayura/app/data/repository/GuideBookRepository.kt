@@ -27,6 +27,7 @@ class GuideBookRepository(
             title = title,
             subjectId = getString("subjectId") ?: "",
             author = getString("author") ?: "",
+            category = getString("category") ?: "",
             fileUrl = fileUrl
         )
     }

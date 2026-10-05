@@ -27,6 +27,7 @@ class MarkingSchemeRepository(
             title = title,
             subjectId = getString("subjectId") ?: "",
             year = readYear(get("year")),
+            type = getString("type") ?: "",
             fileUrl = fileUrl
         )
     }
