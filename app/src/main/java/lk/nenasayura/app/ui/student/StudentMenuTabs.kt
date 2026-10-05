@@ -41,16 +41,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaIconColors
+
 
 /** Resources tab: the free study material (same screens guests use). */
 @Composable
 fun StudentResourcesTab(actions: StudentHomeActions, modifier: Modifier = Modifier) {
     MenuTab(modifier = modifier) {
-        MenuItemCard("Papers", "Past, model, provincial and target papers", Icons.Filled.Description, actions.onOpenPapers)
-        MenuItemCard("Marking Schemes", "Check your answers step by step", Icons.Filled.FactCheck, actions.onOpenMarkingSchemes)
-        MenuItemCard("Quizzes", "Practice MCQs with explanations", Icons.Filled.Quiz, actions.onOpenQuizzes)
-        MenuItemCard("Guide Books", "Teacher guides and study books", Icons.AutoMirrored.Filled.MenuBook, actions.onOpenGuideBooks)
-        MenuItemCard("Search", "Find any subject or resource", Icons.Filled.Search, actions.onOpenSearch)
+        MenuItemCard("Papers", "Past, model, provincial and target papers", Icons.Filled.Description, actions.onOpenPapers, palette = NenaIconColors.Papers)
+        MenuItemCard("Marking Schemes", "Check your answers step by step", Icons.Filled.FactCheck, actions.onOpenMarkingSchemes, palette = NenaIconColors.MarkingSchemes)
+        MenuItemCard("Quizzes", "Practice MCQs with explanations", Icons.Filled.Quiz, actions.onOpenQuizzes, palette = NenaIconColors.Quizzes)
+        MenuItemCard("Guide Books", "Teacher guides and study books", Icons.AutoMirrored.Filled.MenuBook, actions.onOpenGuideBooks, palette = NenaIconColors.GuideBooks)
+        MenuItemCard("Search", "Find any subject or resource", Icons.Filled.Search, actions.onOpenSearch, palette = NenaIconColors.Progress)
     }
 }
 
@@ -58,10 +61,10 @@ fun StudentResourcesTab(actions: StudentHomeActions, modifier: Modifier = Modifi
 @Composable
 fun StudentStudyTab(actions: StudentHomeActions, modifier: Modifier = Modifier) {
     MenuTab(modifier = modifier) {
-        MenuItemCard("Teachers", "Choose a teacher and see their notes and videos", Icons.Filled.School, actions.onOpenTeachers)
-        MenuItemCard("Timetable", "Your weekly classes and study times", Icons.Filled.CalendarMonth, actions.onOpenTimetable)
-        MenuItemCard("Reminders", "Study, exam and revision reminders", Icons.Filled.Notifications, actions.onOpenReminders)
-        MenuItemCard("Study Analytics", "Track your quiz results and progress", Icons.Filled.BarChart, actions.onOpenAnalytics)
+        MenuItemCard("Teachers", "Choose a teacher and see their notes and videos", Icons.Filled.School, actions.onOpenTeachers, palette = NenaIconColors.Teacher)
+        MenuItemCard("Timetable", "Your weekly classes and study times", Icons.Filled.CalendarMonth, actions.onOpenTimetable, palette = NenaIconColors.Timetable)
+        MenuItemCard("Reminders", "Study, exam and revision reminders", Icons.Filled.Notifications, actions.onOpenReminders, palette = NenaIconColors.Reminders)
+        MenuItemCard("Study Analytics", "Track your quiz results and progress", Icons.Filled.BarChart, actions.onOpenAnalytics, palette = NenaIconColors.Progress)
     }
 }
 
@@ -88,6 +91,7 @@ fun MenuItemCard(
     subtitle: String,
     icon: ImageVector,
     onClick: () -> Unit,
+    palette: IconPalette = IconPalette(NenaPrimary, NenaPrimaryContainer),
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -104,10 +108,10 @@ fun MenuItemCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(NenaPrimaryContainer, CircleShape),
+                    .background(palette.container, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = NenaPrimary)
+                Icon(imageVector = icon, contentDescription = null, tint = palette.tint)
             }
             Spacer(modifier = Modifier.width(14.dp))
             Column(modifier = Modifier.weight(1f)) {

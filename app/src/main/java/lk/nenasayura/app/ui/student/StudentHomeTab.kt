@@ -45,12 +45,20 @@ import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.TextButton
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaIconColors
+import lk.nenasayura.app.ui.student.reviews.ReviewsSection
 
 private data class Shortcut(
     val label: String,
     val icon: ImageVector,
+    val palette: IconPalette,
     val onClick: () -> Unit
 )
+
 
 /** Home tab: welcome header, quick shortcuts and highlight cards. */
 @Composable
@@ -60,10 +68,10 @@ fun StudentHomeTab(
     modifier: Modifier = Modifier
 ) {
     val shortcuts = listOf(
-        Shortcut("Papers", Icons.Filled.Description, actions.onOpenPapers),
-        Shortcut("Quizzes", Icons.Filled.Quiz, actions.onOpenQuizzes),
-        Shortcut("Timetable", Icons.Filled.CalendarMonth, actions.onOpenTimetable),
-        Shortcut("Reminders", Icons.Filled.Notifications, actions.onOpenReminders)
+        Shortcut("Papers", Icons.Filled.Description, NenaIconColors.Papers, actions.onOpenPapers),
+        Shortcut("Quizzes", Icons.Filled.Quiz, NenaIconColors.Quizzes, actions.onOpenQuizzes),
+        Shortcut("Timetable", Icons.Filled.CalendarMonth, NenaIconColors.Timetable, actions.onOpenTimetable),
+        Shortcut("Reminders", Icons.Filled.Notifications, NenaIconColors.Reminders, actions.onOpenReminders)
     )
 
     Column(
@@ -74,12 +82,34 @@ fun StudentHomeTab(
         StudentHeader(name = name, onOpenSearch = actions.onOpenSearch)
 
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-            Text(
-                text = "Quick access",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            // Heading with a small "See all" action on the same row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Quick access",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(
+                    onClick = actions.onOpenQuickAccess,
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "See all",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -88,6 +118,12 @@ fun StudentHomeTab(
                     ShortcutTile(shortcut = shortcut, modifier = Modifier.weight(1f))
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            ReviewsSection(
+                onViewAll = actions.onOpenReviews,
+                onWriteReview = actions.onWriteReview
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
             Text(
@@ -102,14 +138,16 @@ fun StudentHomeTab(
                 title = "My teacher",
                 subtitle = "Choose a teacher to get notes, model papers and videos",
                 icon = Icons.Filled.School,
-                onClick = actions.onOpenTeachers
+                onClick = actions.onOpenTeachers,
+                palette = NenaIconColors.Teacher
             )
             Spacer(modifier = Modifier.height(10.dp))
             MenuItemCard(
                 title = "Study progress",
                 subtitle = "See how your quizzes and study time are going",
                 icon = Icons.Filled.BarChart,
-                onClick = actions.onOpenAnalytics
+                onClick = actions.onOpenAnalytics,
+                palette = NenaIconColors.Progress
             )
         }
     }
@@ -194,13 +232,13 @@ private fun ShortcutTile(shortcut: Shortcut, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(NenaPrimaryContainer, CircleShape),
+                    .background(shortcut.palette.container, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = shortcut.icon,
                     contentDescription = null,
-                    tint = NenaPrimary
+                    tint = shortcut.palette.tint
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
