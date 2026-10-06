@@ -14,7 +14,7 @@ import lk.nenasayura.app.data.repository.PaymentRepository
 data class EarningsUiState(
     val loading: Boolean = true,
     val errorMessage: String? = null,
-    /** Different students who have paid and so have access. */
+    /** Different students who have paid, so they have access. */
     val paidStudents: Int = 0,
     val pendingCount: Int = 0,
     val gross: Double = 0.0,
@@ -24,6 +24,7 @@ data class EarningsUiState(
     val paidPayments: List<Payment> = emptyList()
 )
 
+/** Works out how many students paid a teacher and what the teacher receives after the admin's cut. */
 class TeacherDashboardViewModel(
     private val repository: PaymentRepository = PaymentRepository()
 ) : ViewModel() {

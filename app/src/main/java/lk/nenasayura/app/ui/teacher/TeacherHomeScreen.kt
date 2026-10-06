@@ -1,255 +1,164 @@
 package lk.nenasayura.app.ui.teacher
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Dashboard
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import lk.nenasayura.app.core.session.UserSession
-import lk.nenasayura.app.core.session.currentSession
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.google.firebase.auth.FirebaseAuth
+import lk.nenasayura.app.ui.common.ErrorView
+import lk.nenasayura.app.ui.common.LoadingView
+import lk.nenasayura.app.ui.common.NenaTopBar
+import lk.nenasayura.app.ui.teacher.content.MyContentTab
+import lk.nenasayura.app.ui.teacher.dashboard.TeacherDashboardScreen
+import lk.nenasayura.app.ui.teacher.profile.TeacherProfileTab
+import lk.nenasayura.app.ui.teacher.upload.UploadScreen
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
-import lk.nenasayura.app.ui.theme.NenaSecondary
-import lk.nenasayura.app.ui.teacher.upload.UploadScreen
-import lk.nenasayura.app.ui.teacher.dashboard.TeacherDashboardScreen
 
-
-private enum class TeacherTab(val label: String, val icon: ImageVector) {
-    DASHBOARD("Dashboard", Icons.Filled.Dashboard),
-    MY_CONTENT("My Content", Icons.Filled.Folder),
-    UPLOAD("Upload", Icons.Filled.Add),
-    PROFILE("Profile", Icons.Filled.Person)
+private enum class TeacherTab(val label: String, val title: String, val icon: ImageVector) {
+    Home("Home", "Home", Icons.Filled.Home),
+    Content("My Content", "My Content", Icons.Filled.Folder),
+    Upload("Upload", "Upload Material", Icons.Filled.CloudUpload),
+    Profile("Profile", "My Profile", Icons.Filled.Person)
 }
 
-
+/**
+ * Home of a logged-in teacher, with a bottom navigation bar.
+ * Same layout as the Student Home, so both roles feel like one app.
+ */
 @Composable
-fun TeacherHomeScreen(onSignOut: () -> Unit) {
-    val session by currentSession()
-    val name = (session as? UserSession.LoggedIn)?.name ?: "Teacher"
-    var selectedTab by remember { mutableStateOf(TeacherTab.DASHBOARD) }
+fun TeacherHomeScreen(
+    onSignOut: () -> Unit,
+    viewModel: TeacherViewModel = viewModel()
+) {
+    val firebaseUser = remember { FirebaseAuth.getInstance().currentUser }
+    val state by viewModel.state.collectAsStateWithLifecycle()
+
+    LaunchedEffect(firebaseUser?.uid) {
+        if (firebaseUser != null) {
+            viewModel.start(firebaseUser.uid, firebaseUser.displayName ?: "", firebaseUser.email ?: "")
+        } else {
+            onSignOut()
+        }
+    }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(state.message) {
+        state.message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.consumeMessage()
+        }
+    }
+
+    // Saved as a number so the selected tab survives rotation
+    var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
+    val selectedTab = TeacherTab.entries[selectedIndex]
+
+    // Back from another tab returns to the Home tab first
+    BackHandler(enabled = selectedTab != TeacherTab.Home) { selectedIndex = 0 }
 
     Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
+        topBar = {
+            // The Home tab draws its own gradient header
+            if (selectedTab != TeacherTab.Home) {
+                NenaTopBar(title = selectedTab.title)
+            }
+        },
         bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                TeacherTab.entries.forEach { tab ->
+            NavigationBar {
+                TeacherTab.entries.forEachIndexed { index, tab ->
                     NavigationBarItem(
-                        selected = selectedTab == tab,
-                        onClick = { selectedTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label) }
+                        selected = index == selectedIndex,
+                        onClick = { selectedIndex = index },
+                        icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
+                        label = { Text(tab.label) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = NenaPrimary,
+                            selectedTextColor = NenaPrimary,
+                            indicatorColor = NenaPrimaryContainer
+                        )
                     )
                 }
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(bottom = innerPadding.calculateBottomPadding())
-        ) {
-            TeacherHeader(name = name, subtitle = headerSubtitle(selectedTab))
+        val profile = state.profile
 
-            when (selectedTab) {
-                TeacherTab.DASHBOARD -> TeacherDashboardScreen(onUploadClick = { selectedTab = TeacherTab.UPLOAD })
-                TeacherTab.MY_CONTENT -> TabPlaceholder("My Content", "Your uploaded notes, tutes, papers and video links will appear here. (Step 3)")
-                TeacherTab.UPLOAD -> UploadScreen()
-                TeacherTab.PROFILE -> ProfileTabPlaceholder(onSignOut = onSignOut)
+        when {
+            state.loading -> LoadingView(modifier = Modifier.padding(innerPadding))
+
+            profile == null -> ErrorView(
+                message = state.errorMessage ?: "Could not load your profile.",
+                onRetry = viewModel::reload,
+                modifier = Modifier.padding(innerPadding)
+            )
+
+            else -> when (selectedTab) {
+                // Home goes edge to edge at the top, so only the bottom padding is applied
+                TeacherTab.Home -> TeacherDashboardScreen(
+                    profile = profile,
+                    contents = state.contents,
+                    onOpenUpload = { selectedIndex = TeacherTab.Upload.ordinal },
+                    onOpenContent = { selectedIndex = TeacherTab.Content.ordinal },
+                    onOpenProfile = { selectedIndex = TeacherTab.Profile.ordinal },
+                    modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
+                )
+
+                TeacherTab.Content -> MyContentTab(
+                    contents = state.contents,
+                    refreshing = state.contentRefreshing,
+                    isFreeTeacher = profile.isFree,
+                    onUploadClick = { selectedIndex = TeacherTab.Upload.ordinal },
+                    onRefresh = { viewModel.refreshContent() },
+                    onDelete = viewModel::deleteContent,
+                    onEdit = viewModel::updateContent,
+                    modifier = Modifier.padding(innerPadding)
+                )
+
+                TeacherTab.Upload -> UploadScreen(
+                    profile = profile,
+                    onUploaded = {
+                        viewModel.refreshContent(message = "Uploaded successfully")
+                        selectedIndex = TeacherTab.Content.ordinal
+                    },
+                    modifier = Modifier.padding(innerPadding)
+                )
+
+                TeacherTab.Profile -> TeacherProfileTab(
+                    profile = profile,
+                    streamSubjects = state.streamSubjects,
+                    saving = state.saving,
+                    onLoadSubjects = viewModel::loadStreamSubjects,
+                    onSave = viewModel::saveProfile,
+                    onSignOut = onSignOut,
+                    modifier = Modifier.padding(innerPadding)
+                )
             }
         }
-    }
-}
-
-private fun headerSubtitle(tab: TeacherTab): String = when (tab) {
-    TeacherTab.DASHBOARD -> "Manage your classes and study material"
-    TeacherTab.MY_CONTENT -> "Everything you have shared with students"
-    TeacherTab.UPLOAD -> "Share something new with your students"
-    TeacherTab.PROFILE -> "How students see you"
-}
-
-@Composable
-private fun TeacherHeader(name: String, subtitle: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                brush = Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)),
-                shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
-            )
-    ) {
-        Column(
-            modifier = Modifier
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Text(
-                text = "Nena Sayura • Teacher",
-                style = MaterialTheme.typography.labelLarge,
-                color = Color.White.copy(alpha = 0.85f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Hello, $name",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Color.White.copy(alpha = 0.85f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun DashboardTab(onUploadClick: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        // Real numbers are filled in at Step 3.
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            StatCard("Total uploads", "0", Modifier.weight(1f))
-            StatCard("Paid items", "0", Modifier.weight(1f))
-            StatCard("Free items", "0", Modifier.weight(1f))
-        }
-        Spacer(modifier = Modifier.height(20.dp))
-        Text(
-            text = "Quick action",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Button(onClick = onUploadClick, modifier = Modifier.fillMaxWidth()) {
-            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(8.dp))
-            Text("Upload new material")
-        }
-    }
-}
-
-@Composable
-private fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = value,
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = NenaPrimary
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-private fun TabPlaceholder(title: String, message: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(
-            modifier = Modifier
-                .size(64.dp)
-                .background(NenaPrimaryContainer, CircleShape),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(Icons.Filled.Folder, contentDescription = null, tint = NenaPrimary)
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = message,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-    }
-}
-
-@Composable
-private fun ProfileTabPlaceholder(onSignOut: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Teacher profile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "View and edit your profile and subjects here. (Step 4)",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center
-        )
-        Spacer(modifier = Modifier.height(24.dp))
-        Button(onClick = onSignOut) { Text("Sign out") }
     }
 }

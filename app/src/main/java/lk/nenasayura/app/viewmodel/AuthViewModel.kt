@@ -23,6 +23,8 @@ class AuthViewModel(
     fun isLoggedIn(): Boolean = repo.isLoggedIn()
     fun getCurrentUser(): User? = repo.getCurrentUser()
 
+    fun loadProfile(onResult: (Result<User?>) -> Unit) = repo.getProfile(onResult)
+
     fun login(email: String, password: String) {
         if (!Validators.isValidEmail(email)) return showError("Enter a valid email")
         if (password.isEmpty()) return showError("Enter your password")

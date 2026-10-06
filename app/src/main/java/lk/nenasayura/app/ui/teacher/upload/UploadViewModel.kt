@@ -12,15 +12,14 @@ import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AccessType
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
-import lk.nenasayura.app.data.repository.SubjectRepository
 import lk.nenasayura.app.data.repository.TeacherContentRepository
 
 data class UploadUiState(
     val type: ContentType = ContentType.SHORT_NOTE,
     val title: String = "",
     val description: String = "",
+    /** The teacher's own subjects (from the profile). */
     val subjects: List<Subject> = emptyList(),
-    val subjectsLoading: Boolean = true,
     val selectedSubject: Subject? = null,
     val access: AccessType = AccessType.FREE,
     val fileUri: Uri? = null,
@@ -28,40 +27,24 @@ data class UploadUiState(
     val videoUrl: String = "",
     val isUploading: Boolean = false,
     val errorMessage: String? = null,
+    /** Becomes true once after a successful upload; the screen reads it and calls [UploadViewModel.clearUploaded]. */
     val uploadedOk: Boolean = false
 )
 
 class UploadViewModel(
-    private val subjectRepository: SubjectRepository = SubjectRepository(),
-    private val contentRepository: TeacherContentRepository = TeacherContentRepository()
+    private val repository: TeacherContentRepository = TeacherContentRepository()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(UploadUiState())
     val state: StateFlow<UploadUiState> = _state.asStateFlow()
 
-    init {
-        loadSubjects()
-    }
-
-    private fun loadSubjects() {
-        viewModelScope.launch {
-            try {
-                val list = subjectRepository.getSubjects()
-                _state.update { it.copy(subjects = list, subjectsLoading = false) }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        subjectsLoading = false,
-                        errorMessage = "Could not load subjects: ${e.localizedMessage}"
-                    )
-                }
-            }
+    /** Sets the subjects the teacher can upload for. One subject is selected automatically. */
+    fun setSubjects(subjects: List<Subject>) {
+        _state.update { current ->
+            val keep = current.selectedSubject?.takeIf { sel -> subjects.any { it.id == sel.id } }
+            current.copy(subjects = subjects, selectedSubject = keep ?: subjects.singleOrNull())
         }
     }
-
-    // ---- form changes (each one also clears old error / success messages) ----
 
     fun onTypeChange(type: ContentType) = edit { it.copy(type = type) }
     fun onTitleChange(value: String) = edit { it.copy(title = value) }
@@ -72,21 +55,20 @@ class UploadViewModel(
 
     fun onFilePicked(uri: Uri, name: String, sizeBytes: Long) {
         if (sizeBytes > MAX_FILE_BYTES) {
-            _state.update {
-                it.copy(errorMessage = "File is too large. Maximum size is 50 MB.", uploadedOk = false)
-            }
+            _state.update { it.copy(errorMessage = "File is too large. Maximum size is 50 MB.") }
             return
         }
         edit { it.copy(fileUri = uri, fileName = name) }
     }
 
+    fun clearUploaded() = _state.update { it.copy(uploadedOk = false) }
+
     private fun edit(change: (UploadUiState) -> UploadUiState) {
-        _state.update { change(it).copy(errorMessage = null, uploadedOk = false) }
+        _state.update { change(it).copy(errorMessage = null) }
     }
 
-    // ---- upload ----
-
-    fun submit(teacherId: String, teacherName: String) {
+    /** [isFreeTeacher] = a free teacher's uploads are always Free. */
+    fun submit(teacherId: String, teacherName: String, isFreeTeacher: Boolean) {
         val s = _state.value
         if (s.isUploading) return
 
@@ -101,21 +83,23 @@ class UploadViewModel(
             else -> null
         }
         if (error != null || subject == null) {
-            _state.update { it.copy(errorMessage = error, uploadedOk = false) }
+            _state.update { it.copy(errorMessage = error) }
             return
         }
 
-        _state.update { it.copy(isUploading = true, errorMessage = null, uploadedOk = false) }
+        val access = if (isFreeTeacher) AccessType.FREE else s.access
+
+        _state.update { it.copy(isUploading = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                contentRepository.upload(
+                repository.upload(
                     teacherId = teacherId,
                     teacherName = teacherName,
                     title = s.title,
                     description = s.description,
                     subject = subject,
                     type = s.type,
-                    access = s.access,
+                    access = access,
                     fileUri = s.fileUri,
                     fileName = s.fileName,
                     videoUrl = s.videoUrl
@@ -136,10 +120,7 @@ class UploadViewModel(
                 throw e
             } catch (e: Exception) {
                 _state.update {
-                    it.copy(
-                        isUploading = false,
-                        errorMessage = "Upload failed: ${e.localizedMessage}"
-                    )
+                    it.copy(isUploading = false, errorMessage = "Upload failed: ${e.localizedMessage}")
                 }
             }
         }

@@ -6,7 +6,6 @@ import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -25,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -41,6 +41,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,11 +57,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import lk.nenasayura.app.core.session.UserSession
-import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.data.model.AccessType
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
+import lk.nenasayura.app.data.model.TeacherProfile
 import lk.nenasayura.app.ui.theme.NenaAccent
 import lk.nenasayura.app.ui.theme.NenaSecondary
 
@@ -73,13 +73,26 @@ private val FILE_TYPES = arrayOf(
     "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 )
 
-/** Upload tab of the Teacher module. */
+/** Upload tab: pick the type, subject and file (or video link), choose Free or Paid. */
 @Composable
-fun UploadScreen(viewModel: UploadViewModel = viewModel()) {
+fun UploadScreen(
+    profile: TeacherProfile,
+    onUploaded: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: UploadViewModel = viewModel()
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val session by currentSession()
-    val login = session as? UserSession.LoggedIn
     val context = LocalContext.current
+
+    LaunchedEffect(profile.subjectIds) { viewModel.setSubjects(profile.subjects) }
+
+    // After a successful upload: tell the Home screen once, then reset the flag.
+    LaunchedEffect(state.uploadedOk) {
+        if (state.uploadedOk) {
+            onUploaded()
+            viewModel.clearUploaded()
+        }
+    }
 
     val filePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -91,18 +104,15 @@ fun UploadScreen(viewModel: UploadViewModel = viewModel()) {
     }
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         // 1) Type
         Label("What are you uploading?")
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            ContentType.entries.forEach { type ->
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(ContentType.entries) { type ->
                 FilterChip(
                     selected = state.type == type,
                     onClick = { viewModel.onTypeChange(type) },
@@ -126,15 +136,27 @@ fun UploadScreen(viewModel: UploadViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // 3) Subject
+        // 3) Subject (one subject: shown as text, several: a dropdown)
         Label("Subject")
-        SubjectPicker(
-            subjects = state.subjects,
-            loading = state.subjectsLoading,
-            selected = state.selectedSubject,
-            enabled = !state.isUploading,
-            onSelect = viewModel::onSubjectSelected
-        )
+        if (state.subjects.size <= 1) {
+            Text(
+                text = state.subjects.firstOrNull()?.name
+                    ?: "No subject found. Add one in the Profile tab.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (state.subjects.isEmpty()) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+            )
+        } else {
+            SubjectPicker(
+                subjects = state.subjects,
+                selected = state.selectedSubject,
+                enabled = !state.isUploading,
+                onSelect = viewModel::onSubjectSelected
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -181,32 +203,40 @@ fun UploadScreen(viewModel: UploadViewModel = viewModel()) {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 6) Free / Paid
+        // 6) Free / Paid (a free teacher's uploads are always free)
         Label("Who can open this?")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            AccessOption(
-                label = "Free",
-                description = "All students can open it",
-                icon = Icons.Filled.LockOpen,
-                color = NenaSecondary,
-                selected = state.access == AccessType.FREE,
-                onClick = { viewModel.onAccessChange(AccessType.FREE) },
-                modifier = Modifier.weight(1f)
+        if (profile.isFree) {
+            Text(
+                text = "You are a free teacher, so every upload is free for all students. " +
+                        "Change your plan in the Profile tab to offer paid material.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            AccessOption(
-                label = "Paid",
-                description = "Only students who paid can open it",
-                icon = Icons.Filled.Lock,
-                color = NenaAccent,
-                selected = state.access == AccessType.PAID,
-                onClick = { viewModel.onAccessChange(AccessType.PAID) },
-                modifier = Modifier.weight(1f)
-            )
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                AccessOption(
+                    label = "Free",
+                    description = "All students can open it",
+                    icon = Icons.Filled.LockOpen,
+                    color = NenaSecondary,
+                    selected = state.access == AccessType.FREE,
+                    onClick = { viewModel.onAccessChange(AccessType.FREE) },
+                    modifier = Modifier.weight(1f)
+                )
+                AccessOption(
+                    label = "Paid",
+                    description = "Only students who paid you can open it",
+                    icon = Icons.Filled.Lock,
+                    color = NenaAccent,
+                    selected = state.access == AccessType.PAID,
+                    onClick = { viewModel.onAccessChange(AccessType.PAID) },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Messages
         state.errorMessage?.let {
             Text(
                 text = it,
@@ -215,23 +245,11 @@ fun UploadScreen(viewModel: UploadViewModel = viewModel()) {
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
-        if (state.uploadedOk) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = NenaSecondary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Uploaded successfully!",
-                    color = NenaSecondary,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-        }
 
         // 7) Upload button
         Button(
-            onClick = { login?.let { viewModel.submit(it.uid, it.name) } },
-            enabled = !state.isUploading && login != null,
+            onClick = { viewModel.submit(profile.uid, profile.name, profile.isFree) },
+            enabled = !state.isUploading,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp)
@@ -268,7 +286,6 @@ private fun Label(text: String) {
 @Composable
 private fun SubjectPicker(
     subjects: List<Subject>,
-    loading: Boolean,
     selected: Subject?,
     enabled: Boolean,
     onSelect: (Subject) -> Unit
@@ -290,11 +307,7 @@ private fun SubjectPicker(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = when {
-                        loading -> "Loading subjects…"
-                        selected != null -> selected.name
-                        else -> "Select subject"
-                    },
+                    text = selected?.name ?: "Select subject",
                     color = if (selected != null) {
                         MaterialTheme.colorScheme.onSurface
                     } else {
@@ -306,21 +319,9 @@ private fun SubjectPicker(
         }
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            if (subjects.isEmpty() && !loading) {
-                DropdownMenuItem(
-                    text = { Text("No subjects found") },
-                    onClick = { expanded = false },
-                    enabled = false
-                )
-            }
             subjects.forEach { subject ->
                 DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (subject.stream.isNotBlank()) "${subject.name} (${subject.stream})"
-                            else subject.name
-                        )
-                    },
+                    text = { Text(subject.name) },
                     onClick = {
                         onSelect(subject)
                         expanded = false

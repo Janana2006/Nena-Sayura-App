@@ -1,15 +1,18 @@
 package lk.nenasayura.app.navigation
 
+import android.app.Activity
 import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
@@ -18,11 +21,11 @@ import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
+import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
+import lk.nenasayura.app.ui.guest.papers.PapersScreen
 import lk.nenasayura.app.ui.student.StudentHomeScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
-import lk.nenasayura.app.ui.guest.papers.PapersScreen
-import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
-import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -34,10 +37,21 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
 
-    // Keep the visible home in step with the login state:
-    //  - a student / teacher who just logged in (or an already restored session)
-    //    goes to their own home
-    //  - after sign-out the user goes back to Guest Home
+    val context = LocalContext.current
+
+    val openRealLogin: () -> Unit = {
+        context.startActivity(
+            Intent(context, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_FROM_GUEST, true)
+        )
+        (context as? Activity)?.finish()
+    }
+
+    val openLoginAfterSignOut: () -> Unit = {
+        context.startActivity(Intent(context, MainActivity::class.java))
+        (context as? Activity)?.finish()
+    }
+
     LaunchedEffect(session, currentRoute) {
         val homeRoute = when {
             session.isStudent -> Routes.STUDENT_HOME
@@ -66,40 +80,46 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
                 onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
                 onOpenSearch = { navController.navigate(Routes.SEARCH) },
-                onLogin = {
-                    val context = navController.context
-                    val intent = Intent(context, MainActivity::class.java)
-                    context.startActivity(intent)
-                    (context as? android.app.Activity)?.finish()
-                }
+                onLogin = openRealLogin
             )
         }
 
-        // Replaced by the authentication teammate's Login screen
         composable(Routes.LOGIN) {
             LoginPlaceholderScreen(onBack = { navController.popBackStack() })
         }
 
-        // Replaced by the full Student Home in Task 7
         composable(Routes.STUDENT_HOME) {
-            StudentHomeScreen(onSignOut = { AppSession.provider.signOut() })
+            StudentHomeScreen(
+                onSignOut = {
+                    FirebaseAuth.getInstance().signOut()
+                    AppSession.provider.signOut()
+                    openLoginAfterSignOut()
+                }
+            )
         }
 
-        // Teacher module (Step 1: shell with 4 tabs; real screens come in later steps)
         composable(Routes.TEACHER_HOME) {
-            TeacherHomeScreen(onSignOut = { AppSession.provider.signOut() })
+            TeacherHomeScreen(
+                onSignOut = {
+                    FirebaseAuth.getInstance().signOut()
+                    AppSession.provider.signOut()
+                    openLoginAfterSignOut()
+                }
+            )
         }
 
-        // Placeholders: each is replaced by a real screen in its own task
         composable(Routes.PAPERS) {
             PapersScreen(onBack = { navController.popBackStack() })
         }
+
         composable(Routes.MARKING_SCHEMES) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
         }
+
         composable(Routes.GUIDE_BOOKS) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
         }
+
         placeholder(Routes.QUIZZES, "Quizzes", navController)
         placeholder(Routes.SEARCH, "Search", navController)
     }

@@ -5,55 +5,58 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.Payment
 
-/** Reads payments and the admin commission setting from Firestore. */
+/**
+ * Repository for handling payment records from Firestore collection "payments".
+ */
 class PaymentRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    /** All payments made to one teacher, newest first. */
-    suspend fun getTeacherPayments(teacherId: String): List<Payment> {
-        val snapshot = db.collection(PAYMENTS)
-            .whereEqualTo("teacherId", teacherId)
-            .get()
-            .await()
-        return snapshot.documents
-            .mapNotNull { it.toPayment() }
-            .sortedByDescending { it.createdAtMillis }
-    }
-
-    /** Current admin commission %, from app_settings/commission { percent: 10 }. */
+    /** Returns the default admin commission percentage (e.g., 10.0%). */
     suspend fun getDefaultCommissionPercent(): Double {
-        val doc = db.collection(SETTINGS).document(COMMISSION_DOC).get().await()
-        return (doc.get("percent") as? Number)?.toDouble() ?: DEFAULT_PERCENT
+        return try {
+            val doc = db.collection(SETTINGS_COLLECTION).document("commission").get().await()
+            doc.getDouble("percent") ?: DEFAULT_COMMISSION
+        } catch (e: Exception) {
+            DEFAULT_COMMISSION
+        }
     }
 
-    // If the real field names differ, change them here only.
-    private fun DocumentSnapshot.toPayment(): Payment? {
-        val studentId = getString("studentId") ?: return null
+    /** Fetches all payments associated with a specific teacher. */
+    suspend fun getTeacherPayments(teacherId: String): List<Payment> {
+        return try {
+            val snapshot = db.collection(COLLECTION)
+                .whereEqualTo("teacherId", teacherId)
+                .get()
+                .await()
+
+            snapshot.documents.map { it.toPayment() }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun DocumentSnapshot.toPayment(): Payment {
         return Payment(
             id = id,
-            studentId = studentId,
-            studentName = getString("studentName") ?: "Student",
+            studentId = getString("studentId") ?: "",
+            studentName = getString("studentName") ?: "",
             teacherId = getString("teacherId") ?: "",
+            teacherName = getString("teacherName") ?: "",
+            subjectId = getString("subjectId") ?: "",
             subjectName = getString("subjectName") ?: "",
-            amount = readAmount(get("amount")),
-            status = getString("status") ?: "",
-            commissionPercent = (get("commissionPercent") as? Number)?.toDouble(),
-            createdAtMillis = getTimestamp("createdAt")?.toDate()?.time ?: 0L
+            amount = getDouble("amount") ?: 0.0,
+            status = getString("status") ?: "paid",
+            commissionPercent = getDouble("commissionPercent"),
+            createdAtMillis = getTimestamp("createdAt")?.toDate()?.time
+                ?: getLong("createdAtMillis")
+                ?: 0L
         )
     }
 
-    // The amount may be saved as a number or as text; accept both.
-    private fun readAmount(value: Any?): Double = when (value) {
-        is Number -> value.toDouble()
-        is String -> value.toDoubleOrNull() ?: 0.0
-        else -> 0.0
-    }
-
-    private companion object {
-        const val PAYMENTS = "payments"
-        const val SETTINGS = "app_settings"
-        const val COMMISSION_DOC = "commission"
-        const val DEFAULT_PERCENT = 10.0
+    companion object {
+        private const val COLLECTION = "payments"
+        private const val SETTINGS_COLLECTION = "settings"
+        private const val DEFAULT_COMMISSION = 10.0
     }
 }

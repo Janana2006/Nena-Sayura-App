@@ -18,6 +18,11 @@ class SubjectRepository(
             .sortedBy { it.name }
     }
 
+    suspend fun getSubjectsByStream(streamId: String): List<Subject> {
+        val all = getSubjects()
+        return if (streamId.isBlank()) all else all.filter { it.stream.equals(streamId, ignoreCase = true) }
+    }
+
     // If the real field names differ, change them here only.
     private fun DocumentSnapshot.toSubject(): Subject? {
         val name = getString("name") ?: return null
