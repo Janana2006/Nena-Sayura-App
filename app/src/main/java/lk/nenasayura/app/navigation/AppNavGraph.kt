@@ -1,9 +1,6 @@
 package lk.nenasayura.app.navigation
 
-<<<<<<< Updated upstream
 import android.content.Intent
-=======
->>>>>>> Stashed changes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -96,23 +93,15 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         // Placeholders: each is replaced by a real screen in its own task
         composable(Routes.PAPERS) {
             PapersScreen(onBack = { navController.popBackStack() })
-<<<<<<< Updated upstream
-        }  // Task 2
+        }
         composable(Routes.MARKING_SCHEMES) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
-        } // Task 3
+        }
         composable(Routes.GUIDE_BOOKS) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
-        } // Task 4
-        placeholder(Routes.QUIZZES, "Quizzes", navController)                 // Task 5
-        placeholder(Routes.SEARCH, "Search", navController)                   // Task 6
-=======
         }
-        placeholder(Routes.MARKING_SCHEMES, "Marking Schemes", navController)
-        placeholder(Routes.GUIDE_BOOKS, "Guide Books", navController)
         placeholder(Routes.QUIZZES, "Quizzes", navController)
         placeholder(Routes.SEARCH, "Search", navController)
->>>>>>> Stashed changes
     }
 }
 
