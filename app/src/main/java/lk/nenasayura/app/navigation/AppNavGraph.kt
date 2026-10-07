@@ -8,38 +8,24 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
-import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
+import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
-import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
-import lk.nenasayura.app.ui.guest.quizzes.QuizScreen
-import lk.nenasayura.app.ui.guest.search.SearchScreen
-import lk.nenasayura.app.ui.student.StudentHomeActions
 import lk.nenasayura.app.ui.student.StudentHomeScreen
-import lk.nenasayura.app.ui.guest.papers.PaperCategoriesScreen
-import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
-import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
-import lk.nenasayura.app.ui.student.QuickAccessScreen
-import lk.nenasayura.app.ui.student.papers.StreamSelectScreen
-import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
-import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
+import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -53,8 +39,6 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
     val context = LocalContext.current
 
-    // Guest kenek "Log in" click kalama Login screen (MainActivity) ekata yanawa.
-    // EXTRA_FROM_GUEST = true nisa Login screen eke "Continue as Guest" button eka hide wenawa.
     val openRealLogin: () -> Unit = {
         context.startActivity(
             Intent(context, MainActivity::class.java)
@@ -63,25 +47,26 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         (context as? Activity)?.finish()
     }
 
-    // Sign out kalama Login screen ekata yanawa, mehedi flag eka naha
-    // nisa "Continue as Guest" button eka aye pennanawa.
     val openLoginAfterSignOut: () -> Unit = {
         context.startActivity(Intent(context, MainActivity::class.java))
         (context as? Activity)?.finish()
     }
 
-    // Keep the visible home in step with the login state:
-    //  - a student who just logged in (or an already restored session) goes to Student Home
-    //  - after sign-out the user goes back to Guest Home
     LaunchedEffect(session, currentRoute) {
-        val isStudent = session.isStudent
-        if (isStudent && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
-            navController.navigate(Routes.STUDENT_HOME) {
+        val homeRoute = when {
+            session.isStudent -> Routes.STUDENT_HOME
+            session.isTeacher -> Routes.TEACHER_HOME
+            else -> null
+        }
+        val onRoleHome = currentRoute == Routes.STUDENT_HOME || currentRoute == Routes.TEACHER_HOME
+
+        if (homeRoute != null && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
+            navController.navigate(homeRoute) {
                 popUpTo(Routes.GUEST_HOME) { inclusive = true }
             }
-        } else if (!isStudent && currentRoute == Routes.STUDENT_HOME) {
+        } else if (homeRoute == null && onRoleHome) {
             navController.navigate(Routes.GUEST_HOME) {
-                popUpTo(Routes.STUDENT_HOME) { inclusive = true }
+                popUpTo(currentRoute!!) { inclusive = true }
             }
         }
     }
@@ -99,30 +84,23 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // Dan use wenne naha (onLogin dan MainActivity ekata yanawa), hebai ain karanna epa
         composable(Routes.LOGIN) {
             LoginPlaceholderScreen(onBack = { navController.popBackStack() })
         }
 
         composable(Routes.STUDENT_HOME) {
             StudentHomeScreen(
-                actions = StudentHomeActions(
-                    onOpenPapers = { navController.navigate(Routes.PAPERS) },
-                    onOpenMarkingSchemes = { navController.navigate(Routes.MARKING_SCHEMES) },
-                    onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
-                    onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) },
-                    onOpenSearch = { navController.navigate(Routes.SEARCH) },
-                    onOpenTeachers = { navController.navigate(Routes.TEACHERS) },
-                    onOpenTimetable = { navController.navigate(Routes.TIMETABLE) },
-                    onOpenReminders = { navController.navigate(Routes.REMINDERS) },
-                    onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
-                    onOpenQuickAccess = { navController.navigate(Routes.QUICK_ACCESS) },
-                    onOpenReviews = { navController.navigate(Routes.REVIEWS) },
-                    onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
-                ),
-                // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
-                    PaperBrowseSelection.clear()
+                    FirebaseAuth.getInstance().signOut()
+                    AppSession.provider.signOut()
+                    openLoginAfterSignOut()
+                }
+            )
+        }
+
+        composable(Routes.TEACHER_HOME) {
+            TeacherHomeScreen(
+                onSignOut = {
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
                     openLoginAfterSignOut()
@@ -131,139 +109,19 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Routes.PAPERS) {
-            if (session.isStudent) {
-                // Students: stream -> subjects first. Once chosen (this session only) show the categories.
-                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
-                if (browse.hasSelection) {
-                    PaperCategoriesScreen(
-                        onBack = { navController.popBackStack() },
-                        onOpenCategory = { category ->
-                            navController.navigate(Routes.papersRoute(category))
-                        },
-                        selection = browse,
-                        onChangeSelection = { navController.navigate(Routes.PAPER_STREAMS) }
-                    )
-                } else {
-                    StreamSelectScreen(
-                        onBack = { navController.popBackStack() },
-                        onStreamSelected = { streamId ->
-                            navController.navigate(Routes.paperSubjectsRoute(streamId))
-                        }
-                    )
-                }
-            } else {
-                // Guests: unchanged
-                PaperCategoriesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenCategory = { category ->
-                        navController.navigate(Routes.papersRoute(category))
-                    }
-                )
-            }
-        }
-        // "Change" button on the categories screen
-        composable(Routes.PAPER_STREAMS) {
-            StreamSelectScreen(
-                onBack = { navController.popBackStack() },
-                onStreamSelected = { streamId ->
-                    navController.navigate(Routes.paperSubjectsRoute(streamId))
-                }
-            )
-        }
-        composable(
-            route = Routes.PAPER_SUBJECTS,
-            arguments = listOf(navArgument("streamId") { type = NavType.StringType })
-        ) {
-            SubjectSelectScreen(
-                onBack = { navController.popBackStack() },
-                onDone = {
-                    // Reopen Papers; it now shows the categories because a selection exists
-                    navController.navigate(Routes.PAPERS) {
-                        popUpTo(Routes.PAPERS) { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable(
-            route = Routes.PAPERS_LIST,
-            arguments = listOf(navArgument("category") { type = NavType.StringType })
-        ) {
             PapersScreen(onBack = { navController.popBackStack() })
         }
+
         composable(Routes.MARKING_SCHEMES) {
-            MarkingSchemeCategoriesScreen(
-                onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.markingSchemesRoute(category))
-                }
-            )
-        }
-        composable(
-            route = Routes.MARKING_SCHEMES_LIST,
-            arguments = listOf(navArgument("category") { type = NavType.StringType })
-        ) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
         }
+
         composable(Routes.GUIDE_BOOKS) {
-            GuideBookCategoriesScreen(
-                onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.guideBooksRoute(category))
-                }
-            )
-        }
-        composable(
-            route = Routes.GUIDE_BOOKS_LIST,
-            arguments = listOf(navArgument("category") { type = NavType.StringType })
-        ) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
         }
-        composable(Routes.QUIZZES) {
-            QuizListScreen(
-                onBack = { navController.popBackStack() },
-                onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
-            )
-        }
-        composable(
-            route = Routes.QUIZ_PLAY,
-            arguments = listOf(navArgument("quizId") { type = NavType.StringType })
-        ) {
-            QuizScreen(
-                onBack = { navController.popBackStack() },
-                onLogin = openRealLogin
-            )
-        }
-        composable(Routes.SEARCH) {
-            SearchScreen(
-                onBack = { navController.popBackStack() },
-                onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
-            )
-        }
-        composable(Routes.QUICK_ACCESS) {
-            QuickAccessScreen(
-                onBack = { navController.popBackStack() },
-                onOpenPapers = { navController.navigate(Routes.PAPERS) },
-                onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
-                onOpenTimetable = { navController.navigate(Routes.TIMETABLE) },
-                onOpenReminders = { navController.navigate(Routes.REMINDERS) },
-                onOpenMarkingSchemes = { navController.navigate(Routes.MARKING_SCHEMES) },
-                onOpenGuideBooks = { navController.navigate(Routes.GUIDE_BOOKS) }
-            )
-        }
-        composable(Routes.REVIEWS) {
-            AllReviewsScreen(
-                onBack = { navController.popBackStack() },
-                onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
-            )
-        }
-        composable(Routes.WRITE_REVIEW) {
-            WriteReviewScreen(onBack = { navController.popBackStack() })
-        }
-        // Student-only screens: each is replaced by a real screen in its own task
-        placeholder(Routes.TEACHERS, "Teachers", navController)
-        placeholder(Routes.TIMETABLE, "Timetable", navController)
-        placeholder(Routes.REMINDERS, "Reminders", navController)
-        placeholder(Routes.ANALYTICS, "Study Analytics", navController)
+
+        placeholder(Routes.QUIZZES, "Quizzes", navController)
+        placeholder(Routes.SEARCH, "Search", navController)
     }
 }
 

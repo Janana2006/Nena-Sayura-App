@@ -1,5 +1,7 @@
 package lk.nenasayura.app.ui.guest.papers
 
+
+
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -14,9 +16,6 @@ import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.PaperRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
-import androidx.lifecycle.SavedStateHandle
-import lk.nenasayura.app.data.model.isInCategory
-import lk.nenasayura.app.core.browse.PaperBrowseSelection
 
 /** Everything the Papers screen needs to draw itself. */
 data class PapersUiState(
@@ -63,13 +62,10 @@ data class PapersUiState(
         }
 }
 
-class PapersViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
-
-    // "past", "model" or "provincial" (the navigation argument)
-    val category: String = savedStateHandle.get<String>("category") ?: "past"
-
-    private val paperRepository = PaperRepository()
-    private val subjectRepository = SubjectRepository()
+class PapersViewModel(
+    private val paperRepository: PaperRepository = PaperRepository(),
+    private val subjectRepository: SubjectRepository = SubjectRepository()
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PapersUiState())
     val uiState: StateFlow<PapersUiState> = _uiState.asStateFlow()
@@ -88,21 +84,8 @@ class PapersViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     val subjectsJob = async { subjectRepository.getSubjects() }
                     papersJob.await() to subjectsJob.await()
                 }
-                // Students pick stream + subjects first. null = no restriction (guests).
-                val browse = PaperBrowseSelection.state.value
-                val allowedIds = if (browse.hasSelection) browse.subjectIds else null
-
                 _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        // Keep only the papers of the chosen category (and chosen subjects)
-                        papers = papers.filter { paper ->
-                            paper.isInCategory(category) &&
-                                    (allowedIds == null || paper.subjectId in allowedIds)
-                        },
-                        subjects = if (allowedIds == null) subjects
-                        else subjects.filter { s -> s.id in allowedIds }
-                    )
+                    it.copy(isLoading = false, papers = papers, subjects = subjects)
                 }
             } catch (e: CancellationException) {
                 throw e

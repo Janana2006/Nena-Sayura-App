@@ -1,83 +1,39 @@
 package lk.nenasayura.app.data.repository
 
+
+
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
-import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
 
-/** Reads A/L subjects from the Firestore "streams" collection. */
+/** Reads A/L subjects from the Firestore "subjects" collection. */
 class SubjectRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
-
-    // Okkoma subjects (Physics wage stream 2kakama thiyena ewa ekak witharai)
     suspend fun getSubjects(): List<Subject> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
+        val snapshot = db.collection(COLLECTION).get().await()
         return snapshot.documents
-            .flatMap { doc -> parseSubjects(doc.get("subjects"), doc.id) }
-            .distinctBy { it.id }
+            .mapNotNull { it.toSubject() }
             .sortedBy { it.name }
     }
 
-    // Stream ekakata adala subjects (e.g. "maths", "bio")
     suspend fun getSubjectsByStream(streamId: String): List<Subject> {
-        val doc = db.collection(COLLECTION).document(streamId).get().await()
-        return parseSubjects(doc.get("subjects"), doc.id).sortedBy { it.name }
+        val all = getSubjects()
+        return if (streamId.isBlank()) all else all.filter { it.stream.equals(streamId, ignoreCase = true) }
     }
 
-    // Okkoma streams (Maths Stream, Bio Stream ...) - subjects ekka
-    suspend fun getStreams(): List<StudyStream> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
-        return snapshot.documents.map { it.toStream() }
-    }
-
-    // Stream ekak (id eken). Nathnam null
-    suspend fun getStream(streamId: String): StudyStream? {
-        val doc = db.collection(COLLECTION).document(streamId).get().await()
-        return if (doc.exists()) doc.toStream() else null
-    }
-
-    private fun DocumentSnapshot.toStream(): StudyStream = StudyStream(
-        id = id,
-        name = getString("name") ?: id,
-        subjects = parseSubjects(get("subjects"), id).sortedBy { it.name }
-    )
-
-    // subjects format 2kama handle karanawa
     // If the real field names differ, change them here only.
-    private fun parseSubjects(raw: Any?, streamId: String): List<Subject> {
-        return when (raw) {
-
-            // { physics: "Physics", chemistry: "Chemistry" }
-            is Map<*, *> -> raw.entries.mapNotNull { entry ->
-                val id = entry.key as? String ?: return@mapNotNull null
-                val name = entry.value as? String ?: return@mapNotNull null
-                Subject(id = id, name = name, stream = streamId)
-            }
-
-            // array of maps: [ { physics: "Physics" }, { id: "x", name: "X" } ]
-            is List<*> -> raw.flatMap { item ->
-                val map = item as? Map<*, *> ?: return@flatMap emptyList<Subject>()
-                val id = map["id"] as? String
-                val name = map["name"] as? String
-
-                if (id != null && name != null) {
-                    listOf(Subject(id = id, name = name, stream = streamId))
-                } else {
-                    map.entries.mapNotNull { entry ->
-                        val key = entry.key as? String ?: return@mapNotNull null
-                        val value = entry.value as? String ?: return@mapNotNull null
-                        Subject(id = key, name = value, stream = streamId)
-                    }
-                }
-            }
-
-            else -> emptyList()
-        }
+    private fun DocumentSnapshot.toSubject(): Subject? {
+        val name = getString("name") ?: return null
+        return Subject(
+            id = id,
+            name = name,
+            stream = getString("stream") ?: ""
+        )
     }
 
     private companion object {
-        const val COLLECTION = "streams"
+        const val COLLECTION = "subjects"
     }
 }

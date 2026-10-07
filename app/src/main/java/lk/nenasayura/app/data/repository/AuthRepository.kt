@@ -5,7 +5,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions   // NEW
 import lk.nenasayura.app.data.model.User
 
 class AuthRepository(
@@ -35,16 +34,13 @@ class AuthRepository(
         db.collection("users").document(fbUser.uid).get()
             .addOnSuccessListener { doc ->
                 if (!doc.exists()) {
-                    // CHANGED: Google login wage profile nathi ayata role danne naha,
-                    // RoleSelect page eka penna role = "" (blank) karanawa
+                    // Google login wage profile nathi ayata: student widihata
                     onResult(
                         Result.success(
                             User(
                                 uid = fbUser.uid,
                                 name = fbUser.displayName ?: "",
-                                email = fbUser.email ?: "",
-                                role = "",
-                                setupDone = false
+                                email = fbUser.email ?: ""
                             )
                         )
                     )
@@ -115,7 +111,7 @@ class AuthRepository(
                         "role" to role,
                         "isFree" to isFree,
                         "fee" to fee,
-                        "setupDone" to false   // teacher saha student dekatama stream/subject select karanna oni
+                        "setupDone" to (role != "teacher")   // teacher nam false, stream/subject select karanna oni
                     )
                     db.collection("users").document(user.uid).set(data)
                         .addOnCompleteListener { saveTask ->
@@ -128,54 +124,11 @@ class AuthRepository(
             }
     }
 
-    // NEW: Google login wage aluth user ge role (saha teacher nam Free/Paid + fee) save karanawa
-    fun saveRole(role: String, isFree: Boolean, fee: Int, onResult: (Result<Unit>) -> Unit) {
-        val user = auth.currentUser
-        if (user == null) {
-            onResult(Result.failure(Exception("Not logged in")))
-            return
-        }
-
-        val data = hashMapOf<String, Any>(
-            "uid" to user.uid,
-            "role" to role,
-            "isFree" to isFree,
-            "fee" to fee,
-            "setupDone" to false        // dan stream/subjects select karanna oni
-        )
-        user.email?.let { data["email"] = it }
-        user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
-
-        db.collection("users").document(user.uid).set(data, SetOptions.merge())
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(Unit))
-                else onResult(Result.failure(task.exception ?: Exception("Failed to save")))
-            }
-    }
-
     fun sendResetEmail(email: String, onResult: (Result<Unit>) -> Unit) {
         auth.sendPasswordResetEmail(email)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) onResult(Result.success(Unit))
                 else onResult(Result.failure(task.exception ?: Exception("Failed to send email")))
-            }
-    }
-
-    // Reset link eke code eka (oobCode) valid da balala, e code eka ekka link wela thiyena email eka denawa
-    fun verifyResetCode(code: String, onResult: (Result<String>) -> Unit) {
-        auth.verifyPasswordResetCode(code)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(task.result ?: ""))
-                else onResult(Result.failure(task.exception ?: Exception("Invalid or expired link")))
-            }
-    }
-
-    // Code eka valid nam aluth password eka save karanawa
-    fun confirmPasswordReset(code: String, newPassword: String, onResult: (Result<Unit>) -> Unit) {
-        auth.confirmPasswordReset(code, newPassword)
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(Unit))
-                else onResult(Result.failure(task.exception ?: Exception("Failed to reset password")))
             }
     }
 

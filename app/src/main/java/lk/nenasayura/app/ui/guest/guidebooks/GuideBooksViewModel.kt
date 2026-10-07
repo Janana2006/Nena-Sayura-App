@@ -16,8 +16,6 @@ import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.GuideBookRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
-import androidx.lifecycle.SavedStateHandle
-import lk.nenasayura.app.data.model.isInCategory
 
 /** Everything the Guide Books screen needs to draw itself. */
 data class GuideBooksUiState(
@@ -54,13 +52,10 @@ data class GuideBooksUiState(
         }
 }
 
-class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
-
-    // "guide" or "resource" (the navigation argument)
-    val category: String = savedStateHandle.get<String>("category") ?: "guide"
-
-    private val guideBookRepository = GuideBookRepository()
-    private val subjectRepository = SubjectRepository()
+class GuideBooksViewModel(
+    private val guideBookRepository: GuideBookRepository = GuideBookRepository(),
+    private val subjectRepository: SubjectRepository = SubjectRepository()
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(GuideBooksUiState())
     val uiState: StateFlow<GuideBooksUiState> = _uiState.asStateFlow()
@@ -80,12 +75,7 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     booksJob.await() to subjectsJob.await()
                 }
                 _uiState.update {
-                    it.copy(
-                        isLoading = false,
-                        // Keep only the books of the chosen category
-                        books = books.filter { book -> book.isInCategory(category) },
-                        subjects = subjects
-                    )
+                    it.copy(isLoading = false, books = books, subjects = subjects)
                 }
             } catch (e: CancellationException) {
                 throw e

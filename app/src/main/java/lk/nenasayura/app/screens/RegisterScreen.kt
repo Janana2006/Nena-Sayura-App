@@ -2,69 +2,34 @@ package lk.nenasayura.app.screens
 
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import lk.nenasayura.app.ui.theme.NenaAccent
-import lk.nenasayura.app.ui.theme.NenaAccentContainer
-import lk.nenasayura.app.ui.theme.NenaBackground
-import lk.nenasayura.app.ui.theme.NenaPrimary
-import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
-import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.viewmodel.AuthUiState
 import lk.nenasayura.app.viewmodel.AuthViewModel
 
@@ -80,13 +45,15 @@ fun RegisterScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
     var isFree by remember { mutableStateOf(true) }
     var feeText by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isLoading = state is AuthUiState.Loading
+
+    val primaryBlue = Color(0xFF2563EB)
+    val lightBlueBg = Color(0xFFF0F5FF)
 
     LaunchedEffect(state) {
         when (val s = state) {
@@ -104,158 +71,160 @@ fun RegisterScreen(
         }
     }
 
-    val fieldShape = RoundedCornerShape(14.dp)
-    val fieldColors = OutlinedTextFieldDefaults.colors(
-        focusedBorderColor = NenaPrimary,
-        focusedLabelColor = NenaPrimary,
-        cursorColor = NenaPrimary,
-        focusedLeadingIconColor = NenaPrimary,
-        unfocusedContainerColor = Color.White,
-        focusedContainerColor = Color.White
-    )
-    val passwordTransformation: VisualTransformation =
-        if (showPassword) VisualTransformation.None else PasswordVisualTransformation()
-    val eyeButton: @Composable () -> Unit = {
-        IconButton(onClick = { showPassword = !showPassword }) {
-            Icon(
-                imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                contentDescription = "Show password"
-            )
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize().background(NenaBackground)) {
-
-        // Guest home eke wage gradient header
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(260.dp)
-                .background(
-                    brush = Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)),
-                    shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFFF8FAFC), Color(0xFFEEF2FF), Color(0xFFFFFFFF))
                 )
-        )
-
+            )
+    ) {
         Column(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // Badge
+            // Header Icon Badge
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                    .size(76.dp)
+                    .clip(CircleShape)
+                    .background(lightBlueBg),
                 contentAlignment = Alignment.Center
             ) {
                 Box(
                     modifier = Modifier
-                        .size(58.dp)
-                        .background(Color.White, CircleShape),
+                        .size(54.dp)
+                        .clip(CircleShape)
+                        .background(primaryBlue),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (role == "teacher") Icons.Default.Person else Icons.Default.School,
-                        contentDescription = null,
-                        tint = NenaPrimary,
-                        modifier = Modifier.size(30.dp)
+                        imageVector = Icons.Default.School,
+                        contentDescription = "Logo",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("Create account", fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Create Account",
+                fontSize = 30.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF1E3A8A)
+            )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = if (role == "teacher") "Share your classes with A/L students"
-                else "Unlock papers, quizzes and teachers",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.9f)
+                text = "Join Nena Sayura today",
+                fontSize = 15.sp,
+                color = Color(0xFF64748B),
+                fontWeight = FontWeight.Medium
             )
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Card(
+            // Student / Teacher toggle
+            RoleSelector(role = role, onRoleChange = { role = it })
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Form Card Container
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                color = Color.White,
+                shadowElevation = 6.dp,
+                tonalElevation = 2.dp
             ) {
-                Column(modifier = Modifier.padding(20.dp)) {
-
-                    Text("I am a", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7280))
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // CHANGED: role eka wenas karanakota form eka clear karanawa
-                    RoleSelector(
-                        role = role,
-                        onRoleChange = { newRole ->
-                            if (newRole != role) {
-                                role = newRole
-                                name = ""
-                                email = ""
-                                password = ""
-                                confirm = ""
-                                showPassword = false
-                                isFree = true
-                                feeText = ""
-                            }
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     OutlinedTextField(
-                        value = name, onValueChange = { name = it },
-                        label = { Text("Full name") },
-                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                        singleLine = true, shape = fieldShape, colors = fieldColors,
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Full Name") },
+                        leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = primaryBlue) },
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primaryBlue,
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedLabelColor = primaryBlue
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     OutlinedTextField(
-                        value = email, onValueChange = { email = it },
-                        label = { Text("Email") },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        value = email,
+                        onValueChange = { email = it },
+                        label = { Text("Email Address") },
+                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = primaryBlue) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        singleLine = true, shape = fieldShape, colors = fieldColors,
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primaryBlue,
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedLabelColor = primaryBlue
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // CHANGED: password walata space type karanna ba (false "Passwords do not match" nathi wenna)
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it.filter { c -> !c.isWhitespace() } },
+                        onValueChange = { password = it },
                         label = { Text("Password") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        trailingIcon = eyeButton,
-                        visualTransformation = passwordTransformation,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        singleLine = true, shape = fieldShape, colors = fieldColors,
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = primaryBlue) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primaryBlue,
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedLabelColor = primaryBlue
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
                     OutlinedTextField(
                         value = confirm,
-                        onValueChange = { confirm = it.filter { c -> !c.isWhitespace() } },
-                        label = { Text("Confirm password") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        visualTransformation = passwordTransformation,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        singleLine = true, shape = fieldShape, colors = fieldColors,
+                        onValueChange = { confirm = it },
+                        label = { Text("Confirm Password") },
+                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = primaryBlue) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = primaryBlue,
+                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                            focusedLabelColor = primaryBlue
+                        ),
                         modifier = Modifier.fillMaxWidth()
                     )
 
                     // Teacher kenek nam witharak penna
                     AnimatedVisibility(visible = role == "teacher") {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Text("Your service", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                            Spacer(modifier = Modifier.height(18.dp))
+                            Text(
+                                "Your Service Offering",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF1E293B)
+                            )
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Row(
@@ -264,7 +233,7 @@ fun RegisterScreen(
                             ) {
                                 ServiceOption(
                                     title = "Free",
-                                    subtitle = "No charge for students",
+                                    subtitle = "No charge",
                                     selected = isFree,
                                     onClick = { isFree = true },
                                     modifier = Modifier.weight(1f)
@@ -281,15 +250,21 @@ fun RegisterScreen(
                             // Paid select kalama fee field eka
                             AnimatedVisibility(visible = !isFree) {
                                 Column {
-                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Spacer(modifier = Modifier.height(14.dp))
                                     OutlinedTextField(
                                         value = feeText,
                                         onValueChange = { feeText = it.filter { c -> c.isDigit() } },
-                                        label = { Text("Fee amount") },
+                                        label = { Text("Fee Amount") },
                                         placeholder = { Text("e.g. 1500") },
                                         prefix = { Text("Rs. ") },
                                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                                        singleLine = true, shape = fieldShape, colors = fieldColors,
+                                        singleLine = true,
+                                        shape = RoundedCornerShape(14.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = primaryBlue,
+                                            unfocusedBorderColor = Color(0xFFE2E8F0),
+                                            focusedLabelColor = primaryBlue
+                                        ),
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 }
@@ -305,40 +280,47 @@ fun RegisterScreen(
                         },
                         enabled = !isLoading,
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().height(52.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = NenaPrimary,
+                            containerColor = primaryBlue,
                             contentColor = Color.White
                         )
                     ) {
-                        if (isLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = Color.White
-                            )
-                            Spacer(modifier = Modifier.size(10.dp))
-                            Text("Please wait...", fontSize = 16.sp)
-                        } else {
-                            Text("Create account", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-                        }
+                        Text(
+                            text = if (isLoading) "Please wait..." else "Register",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
+            // Login Footer
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Text("Already have an account?", color = Color(0xFF6B7280))
-                TextButton(onClick = { onNavigate("Login") }) {
-                    Text("Login", color = NenaPrimary, fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Already have an account?",
+                    color = Color(0xFF64748B),
+                    fontSize = 14.sp
+                )
+                TextButton(
+                    onClick = { onNavigate("Login") },
+                    contentPadding = PaddingValues(horizontal = 4.dp)
+                ) {
+                    Text(
+                        text = "Login",
+                        color = primaryBlue,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
@@ -349,48 +331,29 @@ private fun RoleSelector(role: String, onRoleChange: (String) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(NenaPrimaryContainer, RoundedCornerShape(50))
+            .background(Color(0xFFE2E8F0), RoundedCornerShape(50))
             .padding(4.dp)
     ) {
-        RoleChip(
-            label = "Student",
-            icon = Icons.Default.School,
-            selected = role == "student",
-            onClick = { onRoleChange("student") },
-            modifier = Modifier.weight(1f)
-        )
-        RoleChip(
-            label = "Teacher",
-            icon = Icons.Default.Person,
-            selected = role == "teacher",
-            onClick = { onRoleChange("teacher") },
-            modifier = Modifier.weight(1f)
-        )
-    }
-}
-
-@Composable
-private fun RoleChip(
-    label: String,
-    icon: ImageVector,
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val bg by animateColorAsState(if (selected) NenaPrimary else Color.Transparent, label = "chipBg")
-    val fg by animateColorAsState(if (selected) Color.White else NenaPrimary, label = "chipFg")
-
-    Row(
-        modifier = modifier
-            .background(bg, RoundedCornerShape(50))
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
-        Spacer(modifier = Modifier.size(8.dp))
-        Text(text = label, fontWeight = FontWeight.Medium, color = fg)
+        listOf("student" to "Student", "teacher" to "Teacher").forEach { (value, label) ->
+            val selected = role == value
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(50))
+                    .background(
+                        if (selected) Color(0xFF2563EB) else Color.Transparent
+                    )
+                    .clickable { onRoleChange(value) }
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (selected) Color.White else Color(0xFF475569)
+                )
+            }
+        }
     }
 }
 
@@ -403,32 +366,29 @@ private fun ServiceOption(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val accent = if (title == "Paid") NenaAccent else NenaSecondary
-    val container = if (title == "Paid") NenaAccentContainer else NenaPrimaryContainer
-
+    val primaryBlue = Color(0xFF2563EB)
     Column(
         modifier = modifier
-            .background(if (selected) container else Color.White, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(14.dp))
+            .background(if (selected) Color(0xFFF0F5FF) else Color(0xFFF8FAFC))
             .border(
                 width = if (selected) 2.dp else 1.dp,
-                color = if (selected) accent else Color(0xFFE0E3EB),
-                shape = RoundedCornerShape(16.dp)
+                color = if (selected) primaryBlue else Color(0xFFCBD5E1),
+                shape = RoundedCornerShape(14.dp)
             )
             .clickable(onClick = onClick)
             .padding(14.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = title,
-                fontWeight = FontWeight.Bold,
-                color = if (selected) Color(0xFF1B1B1F) else Color(0xFF6B7280),
-                modifier = Modifier.weight(1f)
-            )
-            if (selected) {
-                Icon(Icons.Default.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
-            }
-        }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(subtitle, fontSize = 12.sp, color = Color(0xFF6B7280))
+        Text(
+            title,
+            fontWeight = FontWeight.Bold,
+            color = if (selected) primaryBlue else Color(0xFF1E293B)
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            subtitle,
+            fontSize = 12.sp,
+            color = Color(0xFF64748B)
+        )
     }
 }
