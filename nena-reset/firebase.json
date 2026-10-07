@@ -5,6 +5,9 @@
     "ignore": [
       "firebase.json",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/acct/__/auth/action", "destination": "/reset.html" }
     ]
   }
 }
