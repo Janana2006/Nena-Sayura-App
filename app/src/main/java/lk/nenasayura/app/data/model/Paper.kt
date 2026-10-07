@@ -20,3 +20,18 @@ fun paperTypeLabel(type: String): String = when (type.lowercase()) {
     "target" -> "Target Paper"
     else -> type.replaceFirstChar { it.uppercase() }
 }
+
+
+/** True when this paper belongs to [category] ("past", "model" or "provincial"). A paper with no type counts as past. */
+fun Paper.isInCategory(category: String): Boolean {
+    val paperType = type.trim().lowercase().ifEmpty { "past" }
+    return paperType == category.lowercase()
+}
+
+/** Screen title for a paper category. */
+fun paperCategoryTitle(category: String): String = when (category.lowercase()) {
+    "past" -> "Past Papers"
+    "model" -> "Model Papers"
+    "provincial" -> "Provincial Papers"
+    else -> "Papers"
+}

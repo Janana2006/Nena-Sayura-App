@@ -34,6 +34,7 @@ import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.data.model.guideBookCategoryTitle
 
 /** Lists guide books with a subject filter. Works for guests and logged-in students. */
 @Composable
@@ -45,9 +46,11 @@ fun GuideBooksScreen(
     val context = LocalContext.current
     val errorMessage = state.errorMessage
     val visibleBooks = state.filteredBooks
+    val categoryTitle = guideBookCategoryTitle(viewModel.category)
+    val badgeText = if (viewModel.category == "resource") "Resource Book" else "Guide Book"
 
     Scaffold(
-        topBar = { NenaTopBar(title = "Guide Books", onBack = onBack) },
+        topBar = { NenaTopBar(title = categoryTitle, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -63,7 +66,9 @@ fun GuideBooksScreen(
                     onRetry = viewModel::load
                 )
 
-                state.books.isEmpty() -> EmptyView(message = "No guide books are available yet.")
+                state.books.isEmpty() -> EmptyView(
+                    message = "No ${categoryTitle.lowercase()} are available yet."
+                )
 
                 else -> {
                     OutlinedTextField(
@@ -72,7 +77,7 @@ fun GuideBooksScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 8.dp),
-                        placeholder = { Text("Search by title, author or subject") },
+                        placeholder = { Text("Search ${categoryTitle.lowercase()}") },
                         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                         trailingIcon = {
                             if (state.query.isNotEmpty()) {
@@ -123,7 +128,7 @@ fun GuideBooksScreen(
                                 DocumentCard(
                                     title = book.title,
                                     subtitle = subtitle,
-                                    badge = "Guide Book",
+                                    badge = badgeText,
                                     onView = { FileActions.openFile(context, book.fileUrl) },
                                     onDownload = {
                                         FileActions.downloadFile(context, book.fileUrl, book.title)

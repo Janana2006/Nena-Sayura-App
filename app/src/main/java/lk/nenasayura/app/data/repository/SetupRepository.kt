@@ -11,21 +11,17 @@ class SetupRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
+    // streams collection eken okkoma streams + subjects + groups
     fun getStreams(onResult: (Result<List<StudyStream>>) -> Unit) {
         db.collection("streams").orderBy("order").get()
             .addOnSuccessListener { snapshot ->
                 val list = snapshot.documents.map { doc ->
-                    val subjects = (doc.get("subjects") as? List<*>)?.mapNotNull { item ->
-                        val map = item as? Map<*, *> ?: return@mapNotNull null
-                        val id = map["id"] as? String ?: return@mapNotNull null
-                        val name = map["name"] as? String ?: return@mapNotNull null
-                        Subject(id = id, name = name)
-                    } ?: emptyList()
-
+                    val subjects = parseSubjects(doc.get("subjects"))
                     StudyStream(
                         id = doc.id,
                         name = doc.getString("name") ?: doc.id,
-                        subjects = subjects
+                        subjects = subjects,
+                        groups = parseGroups(doc.get("groups"), subjects)
                     )
                 }
                 onResult(Result.success(list))
@@ -33,26 +29,83 @@ class SetupRepository(
             .addOnFailureListener { onResult(Result.failure(it)) }
     }
 
-    fun saveTeacherSetup(
+    // groups = ["combined_maths", "physics", "chemistry|ict"]
+    // Hama string ekakama slot ekak, "|" eken options wen karanawa
+    private fun parseGroups(raw: Any?, subjects: List<Subject>): List<List<Subject>> {
+        val items = raw as? List<*> ?: return emptyList()
+        val byId = subjects.associateBy { it.id }
+
+        return items.mapNotNull { item ->
+            val text = item as? String ?: return@mapNotNull null
+            val options = text.split("|")
+                .map { it.trim() }
+                .mapNotNull { id -> byId[id] }
+            if (options.isEmpty()) null else options
+        }
+    }
+
+    // subjects format 2kama handle karanawa
+    private fun parseSubjects(raw: Any?): List<Subject> {
+        return when (raw) {
+
+            // Format 1: subjects = map  { physics: "Physics", chemistry: "Chemistry" }
+            is Map<*, *> -> raw.entries
+                .mapNotNull { entry ->
+                    val id = entry.key as? String ?: return@mapNotNull null
+                    val name = entry.value as? String ?: return@mapNotNull null
+                    Subject(id = id, name = name)
+                }
+                .sortedBy { it.name }
+
+            // Format 2: subjects = array of maps
+            is List<*> -> raw.flatMap { item ->
+                val map = item as? Map<*, *> ?: return@flatMap emptyList<Subject>()
+                val id = map["id"] as? String
+                val name = map["name"] as? String
+
+                if (id != null && name != null) {
+                    // { id: "physics", name: "Physics" }
+                    listOf(Subject(id = id, name = name))
+                } else {
+                    // { physics: "Physics" }
+                    map.entries.mapNotNull { entry ->
+                        val key = entry.key as? String ?: return@mapNotNull null
+                        val value = entry.value as? String ?: return@mapNotNull null
+                        Subject(id = key, name = value)
+                    }
+                }
+            }
+
+            else -> emptyList()
+        }
+    }
+
+    // teacher saha student dekatama (role anuwa) stream/subjects save karala setupDone = true
+    fun saveSetup(
+        role: String,
         stream: StudyStream,
         subjects: List<Subject>,
         onResult: (Result<Unit>) -> Unit
     ) {
-        val uid = auth.currentUser?.uid
-        if (uid == null) {
+        val user = auth.currentUser
+        if (user == null) {
             onResult(Result.failure(Exception("Not logged in")))
             return
         }
 
-        val data = mapOf(
+        val data = hashMapOf<String, Any>(
+            "uid" to user.uid,
+            "role" to role,
             "streamId" to stream.id,
             "streamName" to stream.name,
             "subjectIds" to subjects.map { it.id },
             "subjectNames" to subjects.map { it.name },
             "setupDone" to true
         )
+        user.email?.let { data["email"] = it }
+        user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
 
-        db.collection("users").document(uid).set(data, SetOptions.merge())
+        db.collection("users").document(user.uid).set(data, SetOptions.merge())
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) onResult(Result.success(Unit))
                 else onResult(Result.failure(task.exception ?: Exception("Failed to save")))

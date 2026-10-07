@@ -15,6 +15,8 @@ import lk.nenasayura.app.data.model.MarkingScheme
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.MarkingSchemeRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
+import androidx.lifecycle.SavedStateHandle
+import lk.nenasayura.app.data.model.isInCategory
 
 /** Everything the Marking Schemes screen needs to draw itself. */
 data class MarkingSchemesUiState(
@@ -55,10 +57,13 @@ data class MarkingSchemesUiState(
         }
 }
 
-class MarkingSchemesViewModel(
-    private val markingSchemeRepository: MarkingSchemeRepository = MarkingSchemeRepository(),
-    private val subjectRepository: SubjectRepository = SubjectRepository()
-) : ViewModel() {
+class MarkingSchemesViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
+
+    // "past", "model" or "provincial" (the navigation argument)
+    val category: String = savedStateHandle.get<String>("category") ?: "past"
+
+    private val markingSchemeRepository = MarkingSchemeRepository()
+    private val subjectRepository = SubjectRepository()
 
     private val _uiState = MutableStateFlow(MarkingSchemesUiState())
     val uiState: StateFlow<MarkingSchemesUiState> = _uiState.asStateFlow()
@@ -78,7 +83,12 @@ class MarkingSchemesViewModel(
                     schemesJob.await() to subjectsJob.await()
                 }
                 _uiState.update {
-                    it.copy(isLoading = false, schemes = schemes, subjects = subjects)
+                    it.copy(
+                        isLoading = false,
+                        // Keep only the schemes of the chosen category
+                        schemes = schemes.filter { scheme -> scheme.isInCategory(category) },
+                        subjects = subjects
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
