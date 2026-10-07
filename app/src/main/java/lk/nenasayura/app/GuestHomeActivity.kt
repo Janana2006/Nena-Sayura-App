@@ -1,7 +1,5 @@
 package lk.nenasayura.app
 
-
-
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -12,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
+import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.navigation.AppNavGraph
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 
@@ -36,5 +35,11 @@ class GuestHomeActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        // The Papers stream/subject choice is temporary: forget it when the user leaves the app
+        if (isFinishing) PaperBrowseSelection.clear()
+        super.onDestroy()
     }
 }

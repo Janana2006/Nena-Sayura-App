@@ -1,7 +1,9 @@
 package lk.nenasayura.app.data.repository
 
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
 
 /** Reads A/L subjects from the Firestore "streams" collection. */
@@ -23,6 +25,24 @@ class SubjectRepository(
         val doc = db.collection(COLLECTION).document(streamId).get().await()
         return parseSubjects(doc.get("subjects"), doc.id).sortedBy { it.name }
     }
+
+    // Okkoma streams (Maths Stream, Bio Stream ...) - subjects ekka
+    suspend fun getStreams(): List<StudyStream> {
+        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
+        return snapshot.documents.map { it.toStream() }
+    }
+
+    // Stream ekak (id eken). Nathnam null
+    suspend fun getStream(streamId: String): StudyStream? {
+        val doc = db.collection(COLLECTION).document(streamId).get().await()
+        return if (doc.exists()) doc.toStream() else null
+    }
+
+    private fun DocumentSnapshot.toStream(): StudyStream = StudyStream(
+        id = id,
+        name = getString("name") ?: id,
+        subjects = parseSubjects(get("subjects"), id).sortedBy { it.name }
+    )
 
     // subjects format 2kama handle karanawa
     // If the real field names differ, change them here only.

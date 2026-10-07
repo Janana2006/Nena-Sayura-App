@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
+import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
@@ -34,6 +35,9 @@ import lk.nenasayura.app.ui.guest.papers.PaperCategoriesScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
 import lk.nenasayura.app.ui.student.QuickAccessScreen
+import lk.nenasayura.app.ui.student.papers.StreamSelectScreen
+import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 
@@ -118,6 +122,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 ),
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
+                    PaperBrowseSelection.clear()
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
                     openLoginAfterSignOut()
@@ -126,9 +131,57 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         }
 
         composable(Routes.PAPERS) {
-            PaperCategoriesScreen(
+            if (session.isStudent) {
+                // Students: stream -> subjects first. Once chosen (this session only) show the categories.
+                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                if (browse.hasSelection) {
+                    PaperCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.papersRoute(category))
+                        },
+                        selection = browse,
+                        onChangeSelection = { navController.navigate(Routes.PAPER_STREAMS) }
+                    )
+                } else {
+                    StreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { streamId ->
+                            navController.navigate(Routes.paperSubjectsRoute(streamId))
+                        }
+                    )
+                }
+            } else {
+                // Guests: unchanged
+                PaperCategoriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(Routes.papersRoute(category))
+                    }
+                )
+            }
+        }
+        // "Change" button on the categories screen
+        composable(Routes.PAPER_STREAMS) {
+            StreamSelectScreen(
                 onBack = { navController.popBackStack() },
-                onOpenCategory = { category -> navController.navigate(Routes.papersRoute(category)) }
+                onStreamSelected = { streamId ->
+                    navController.navigate(Routes.paperSubjectsRoute(streamId))
+                }
+            )
+        }
+        composable(
+            route = Routes.PAPER_SUBJECTS,
+            arguments = listOf(navArgument("streamId") { type = NavType.StringType })
+        ) {
+            SubjectSelectScreen(
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    // Reopen Papers; it now shows the categories because a selection exists
+                    navController.navigate(Routes.PAPERS) {
+                        popUpTo(Routes.PAPERS) { inclusive = true }
+                    }
+                }
             )
         }
         composable(

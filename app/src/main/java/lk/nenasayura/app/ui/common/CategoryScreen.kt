@@ -1,7 +1,5 @@
 package lk.nenasayura.app.ui.common
 
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,7 +46,8 @@ fun CategoryScreen(
     title: String,
     heading: String,
     categories: List<CategoryItem>,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    header: (@Composable () -> Unit)? = null
 ) {
     Scaffold(
         topBar = { NenaTopBar(title = title, onBack = onBack) },
@@ -62,6 +61,7 @@ fun CategoryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            header?.invoke()
             Text(
                 text = heading,
                 style = MaterialTheme.typography.titleLarge,
@@ -73,7 +73,7 @@ fun CategoryScreen(
 }
 
 @Composable
-private fun CategoryCard(item: CategoryItem) {
+internal fun CategoryCard(item: CategoryItem) {
     Card(
         onClick = item.onClick,
         modifier = Modifier.fillMaxWidth(),

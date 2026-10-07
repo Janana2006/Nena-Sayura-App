@@ -11,6 +11,10 @@ object Routes {
 
     // Public resources (available to guests and students)
     const val PAPERS = "papers"
+    // Student flow: Papers -> choose stream -> choose subjects -> categories
+    const val PAPER_STREAMS = "paper_streams"
+    const val PAPER_SUBJECTS = "paper_subjects/{streamId}"
+    fun paperSubjectsRoute(streamId: String) = "paper_subjects/$streamId"
     const val PAPERS_LIST = "papers/{category}"
     fun papersRoute(category: String) = "papers/$category"
     const val MARKING_SCHEMES = "marking_schemes"
