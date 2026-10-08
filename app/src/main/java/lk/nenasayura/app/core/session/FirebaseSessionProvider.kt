@@ -19,6 +19,16 @@ object FirebaseSessionProvider : SessionProvider {
         )
     }
 
+    // Teacher login una passe session eka set karanawa (Teacher Home ekata yanna)
+    fun signInTeacher(uid: String, name: String, email: String) {
+        _session.value = UserSession.LoggedIn(
+            uid = uid,
+            name = name,
+            email = email,
+            role = UserRole.TEACHER
+        )
+    }
+
     override fun signOut() {
         _session.value = UserSession.Guest
     }

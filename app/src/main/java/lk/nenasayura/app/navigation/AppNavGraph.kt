@@ -20,6 +20,7 @@ import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
+import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
@@ -40,6 +41,7 @@ import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
+import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -74,14 +76,20 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     //  - a student who just logged in (or an already restored session) goes to Student Home
     //  - after sign-out the user goes back to Guest Home
     LaunchedEffect(session, currentRoute) {
-        val isStudent = session.isStudent
-        if (isStudent && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
-            navController.navigate(Routes.STUDENT_HOME) {
+        val homeRoute = when {
+            session.isStudent -> Routes.STUDENT_HOME
+            session.isTeacher -> Routes.TEACHER_HOME
+            else -> null
+        }
+        val onRoleHome = currentRoute == Routes.STUDENT_HOME || currentRoute == Routes.TEACHER_HOME
+
+        if (homeRoute != null && (currentRoute == Routes.GUEST_HOME || currentRoute == Routes.LOGIN)) {
+            navController.navigate(homeRoute) {
                 popUpTo(Routes.GUEST_HOME) { inclusive = true }
             }
-        } else if (!isStudent && currentRoute == Routes.STUDENT_HOME) {
+        } else if (homeRoute == null && onRoleHome) {
             navController.navigate(Routes.GUEST_HOME) {
-                popUpTo(Routes.STUDENT_HOME) { inclusive = true }
+                popUpTo(currentRoute!!) { inclusive = true }
             }
         }
     }
@@ -123,6 +131,16 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
                     PaperBrowseSelection.clear()
+                    FirebaseAuth.getInstance().signOut()
+                    AppSession.provider.signOut()
+                    openLoginAfterSignOut()
+                }
+            )
+        }
+
+        composable(Routes.TEACHER_HOME) {
+            TeacherHomeScreen(
+                onSignOut = {
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
                     openLoginAfterSignOut()

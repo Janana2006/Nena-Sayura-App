@@ -25,3 +25,7 @@ sealed interface UserSession {
 /** True only for a logged-in user whose role is Student. */
 val UserSession.isStudent: Boolean
     get() = this is UserSession.LoggedIn && role == UserRole.STUDENT
+
+/** True only for a logged-in user whose role is Teacher. */
+val UserSession.isTeacher: Boolean
+    get() = this is UserSession.LoggedIn && role == UserRole.TEACHER

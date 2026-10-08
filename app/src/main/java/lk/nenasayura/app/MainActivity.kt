@@ -26,9 +26,9 @@ import lk.nenasayura.app.screens.HomeScreen
 import lk.nenasayura.app.screens.LoginScreen
 import lk.nenasayura.app.screens.RegisterScreen
 import lk.nenasayura.app.screens.ResetPasswordScreen
-import lk.nenasayura.app.screens.RoleSelectScreen   // NEW
+import lk.nenasayura.app.screens.RoleSelectScreen
 import lk.nenasayura.app.screens.SetupScreen
-import lk.nenasayura.app.screens.TeacherHomeScreen
+import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 import lk.nenasayura.app.viewmodel.AuthViewModel
 import lk.nenasayura.app.viewmodel.SetupViewModel
@@ -95,7 +95,6 @@ class MainActivity : ComponentActivity() {
                     if (resetCode != null) selectScreen = "ResetPassword"
                 }
 
-                // Register una passe Login page ekata yawana email/password
                 var prefillEmail by remember { mutableStateOf("") }
                 var prefillPassword by remember { mutableStateOf("") }
 
@@ -105,18 +104,28 @@ class MainActivity : ComponentActivity() {
                         AppSession.provider.signOut()
                         startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
                         finish()
-                    } else if (screen == "Home") {
-                        // Student login una: session eka set karala Student Home ekata yanna
+                    } else if (screen == "Home" || screen == "TeacherHome") {
+                        // Login (normal ho Google) una passe role eka balala home eka decide karanawa:
+                        //  teacher -> Teacher Home, student -> Student Home (GuestHomeActivity)
                         authViewModel.loadProfile { result ->
                             val profile = result.getOrNull()
                             if (profile != null) {
-                                FirebaseSessionProvider.signInStudent(
-                                    uid = profile.uid,
-                                    name = profile.name,
-                                    email = profile.email
-                                )
-                                startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
-                                finish()
+                                if (profile.role == "teacher") {
+                                    FirebaseSessionProvider.signInTeacher(
+                                        uid = profile.uid,
+                                        name = profile.name,
+                                        email = profile.email
+                                    )
+                                    selectScreen = "TeacherHome"
+                                } else {
+                                    FirebaseSessionProvider.signInStudent(
+                                        uid = profile.uid,
+                                        name = profile.name,
+                                        email = profile.email
+                                    )
+                                    startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
+                                    finish()
+                                }
                             } else {
                                 selectScreen = "Login"
                             }
@@ -182,7 +191,7 @@ class MainActivity : ComponentActivity() {
                             modifier = modifier,
                             viewModel = setupViewModel,
                             role = "teacher",
-                            onDone = { selectScreen = "TeacherHome" },
+                            onDone = { navigate("TeacherHome") },
                             onLogout = {
                                 authViewModel.logout()
                                 selectScreen = "Login"
@@ -201,7 +210,14 @@ class MainActivity : ComponentActivity() {
                             }
                         )
 
-                        "TeacherHome" -> TeacherHomeScreen(modifier, authViewModel, navigate)
+                        // Teacher: real Teacher Home (ui/teacher)
+                        "TeacherHome" -> TeacherHomeScreen(
+                            onSignOut = {
+                                AppSession.provider.signOut()
+                                authViewModel.logout()
+                                selectScreen = "Login"
+                            }
+                        )
                         "Home" -> HomeScreen(modifier, authViewModel, navigate)
                     }
                 }
