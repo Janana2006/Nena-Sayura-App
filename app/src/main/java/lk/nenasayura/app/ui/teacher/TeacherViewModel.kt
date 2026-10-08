@@ -1,5 +1,6 @@
 package lk.nenasayura.app.ui.teacher
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -58,21 +59,28 @@ class TeacherViewModel(
         val uid = loadedFor ?: return
         _state.update { it.copy(loading = true, errorMessage = null) }
         viewModelScope.launch {
-            try {
-                val profile = profileRepository.getProfile(uid, fallbackName, fallbackEmail)
-                val contents = contentRepository.getContents(uid)
-                _state.update {
-                    it.copy(loading = false, profile = profile, contents = contents)
-                }
+            // Profile read karanna ba nam, login eke name / email walin screen eka pennanawa
+            val profile = try {
+                profileRepository.getProfile(uid, fallbackName, fallbackEmail)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _state.update {
-                    it.copy(
-                        loading = false,
-                        errorMessage = "Could not load your data: ${e.localizedMessage}"
-                    )
-                }
+                Log.w("TeacherVM", "Profile load failed: ${e.localizedMessage}")
+                TeacherProfile(uid = uid, name = fallbackName, email = fallbackEmail)
+            }
+
+            // Uploads read karanna ba nam, empty list ekak pennanawa
+            val contents = try {
+                contentRepository.getContents(uid)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("TeacherVM", "Uploads load failed: ${e.localizedMessage}")
+                emptyList()
+            }
+
+            _state.update {
+                it.copy(loading = false, profile = profile, contents = contents)
             }
         }
     }
