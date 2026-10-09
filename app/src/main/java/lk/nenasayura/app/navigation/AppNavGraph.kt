@@ -16,6 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
+import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
@@ -25,6 +26,8 @@ import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideStreamSelectScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideSubjectsScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
 import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
@@ -131,6 +134,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
                     PaperBrowseSelection.clear()
+                    GuideBrowseSelection.clear()
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
                     openLoginAfterSignOut()
@@ -222,20 +226,67 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         ) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
         }
+
+        // ---------- Guide Books ----------
         composable(Routes.GUIDE_BOOKS) {
-            GuideBookCategoriesScreen(
-                onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.guideBooksRoute(category))
+            if (session.isStudent) {
+                // Students: choose a stream first (this session only), then the categories
+                val guideBrowse by GuideBrowseSelection.state.collectAsStateWithLifecycle()
+                if (guideBrowse.hasSelection) {
+                    GuideBookCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.guideBooksRoute(category))
+                        },
+                        selection = guideBrowse,
+                        onChangeSelection = { GuideBrowseSelection.clear() }
+                    )
+                } else {
+                    GuideStreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { stream -> GuideBrowseSelection.select(stream) }
+                    )
                 }
-            )
+            } else {
+                // Guests: unchanged
+                GuideBookCategoriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(Routes.guideBooksRoute(category))
+                    }
+                )
+            }
         }
         composable(
             route = Routes.GUIDE_BOOKS_LIST,
             arguments = listOf(navArgument("category") { type = NavType.StringType })
+        ) { entry ->
+            val category = entry.arguments?.getString("category") ?: "guide"
+            if (session.isStudent) {
+                // Students: the subjects of their stream
+                GuideSubjectsScreen(
+                    category = category,
+                    onBack = { navController.popBackStack() },
+                    onOpenSubject = { subjectId ->
+                        navController.navigate(Routes.guideBooksSubjectRoute(category, subjectId))
+                    }
+                )
+            } else {
+                // Guests: unchanged
+                GuideBooksScreen(onBack = { navController.popBackStack() })
+            }
+        }
+        // Students: the books of one subject
+        composable(
+            route = Routes.GUIDE_BOOKS_SUBJECT,
+            arguments = listOf(
+                navArgument("category") { type = NavType.StringType },
+                navArgument("subjectId") { type = NavType.StringType }
+            )
         ) {
             GuideBooksScreen(onBack = { navController.popBackStack() })
         }
+
         composable(Routes.QUIZZES) {
             QuizListScreen(
                 onBack = { navController.popBackStack() },

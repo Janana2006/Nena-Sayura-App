@@ -24,6 +24,10 @@ object Routes {
     const val GUIDE_BOOKS = "guide_books"
     const val GUIDE_BOOKS_LIST = "guide_books/{category}"
     fun guideBooksRoute(category: String) = "guide_books/$category"
+    // Students: Guide Books -> stream -> category -> subjects -> books of that subject
+    const val GUIDE_BOOKS_SUBJECT = "guide_books/{category}/{subjectId}"
+    fun guideBooksSubjectRoute(category: String, subjectId: String) =
+        "guide_books/$category/$subjectId"
     const val QUIZZES = "quizzes"
     const val QUIZ_PLAY = "quiz/{quizId}"
     fun quizRoute(quizId: String) = "quiz/$quizId"

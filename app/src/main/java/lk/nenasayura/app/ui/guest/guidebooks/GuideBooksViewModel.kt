@@ -1,7 +1,6 @@
 package lk.nenasayura.app.ui.guest.guidebooks
 
-
-
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
@@ -14,10 +13,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Subject
+import lk.nenasayura.app.data.model.isInCategory
 import lk.nenasayura.app.data.repository.GuideBookRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
-import androidx.lifecycle.SavedStateHandle
-import lk.nenasayura.app.data.model.isInCategory
 
 /** Everything the Guide Books screen needs to draw itself. */
 data class GuideBooksUiState(
@@ -26,7 +24,9 @@ data class GuideBooksUiState(
     val books: List<GuideBook> = emptyList(),
     val subjects: List<Subject> = emptyList(),
     val selectedSubjectId: String? = null,
-    val query: String = ""
+    val query: String = "",
+    // Set when a student opened the books of one subject (stream -> category -> subject)
+    val fixedSubjectId: String? = null
 ) {
     fun subjectName(subjectId: String): String =
         subjects.firstOrNull { it.id == subjectId }?.name ?: ""
@@ -59,10 +59,13 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     // "guide" or "resource" (the navigation argument)
     val category: String = savedStateHandle.get<String>("category") ?: "guide"
 
+    // Optional navigation argument: only the books of this subject
+    private val subjectId: String? = savedStateHandle.get<String>("subjectId")
+
     private val guideBookRepository = GuideBookRepository()
     private val subjectRepository = SubjectRepository()
 
-    private val _uiState = MutableStateFlow(GuideBooksUiState())
+    private val _uiState = MutableStateFlow(GuideBooksUiState(fixedSubjectId = subjectId))
     val uiState: StateFlow<GuideBooksUiState> = _uiState.asStateFlow()
 
     init {
@@ -82,8 +85,11 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        // Keep only the books of the chosen category
-                        books = books.filter { book -> book.isInCategory(category) },
+                        // Keep only the books of the chosen category (and the chosen subject)
+                        books = books.filter { book ->
+                            book.isInCategory(category) &&
+                                    (subjectId == null || book.subjectId == subjectId)
+                        },
                         subjects = subjects
                     )
                 }
