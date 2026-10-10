@@ -1,5 +1,6 @@
 package lk.nenasayura.app.ui.admin
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,10 +22,11 @@ import androidx.compose.ui.unit.dp
 private enum class ContentSection(val label: String) {
     Papers("Papers"),
     GuideBooks("Guide Books"),
+    Quizzes("Quizzes"),
     Streams("Streams & Subjects")
 }
 
-/** Content tab: add papers, guide books, streams and subjects. */
+/** Content tab: add papers, guide books, quizzes, streams and subjects. */
 @Composable
 fun AdminContentTab(
     state: AdminUiState,
@@ -35,8 +38,11 @@ fun AdminContentTab(
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
+        // Scrolls sideways because four chips do not fit on a small phone
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             ContentSection.entries.forEachIndexed { index, s ->
@@ -51,6 +57,7 @@ fun AdminContentTab(
         when (section) {
             ContentSection.Papers -> PapersSection(state, viewModel)
             ContentSection.GuideBooks -> GuideBooksSection(state, viewModel)
+            ContentSection.Quizzes -> QuizzesSection(state)
             ContentSection.Streams -> StreamsSection(state, viewModel)
         }
     }

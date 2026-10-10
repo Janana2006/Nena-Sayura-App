@@ -55,13 +55,14 @@ import lk.nenasayura.app.ui.theme.NenaPrimary
 /** A file chosen from the phone (before it is uploaded). */
 data class PickedFile(val uri: Uri, val name: String)
 
-/** White rounded card, same look as the Teacher screens. */
+/** White rounded card, clean modern look. */
 @Composable
 fun AdminCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
@@ -70,11 +71,12 @@ fun AdminCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 
 @Composable
 fun Pill(text: String, background: Color, textColor: Color) {
-    Surface(shape = RoundedCornerShape(8.dp), color = background) {
+    Surface(shape = RoundedCornerShape(10.dp), color = background) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
             color = textColor
         )
     }
@@ -94,8 +96,9 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -110,10 +113,11 @@ fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
                 color = NenaPrimary
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color(0xFF64748B),
                 textAlign = TextAlign.Center
             )
         }
