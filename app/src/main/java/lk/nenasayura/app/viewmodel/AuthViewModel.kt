@@ -35,6 +35,7 @@ class AuthViewModel(
                     val route = when {
                         user == null -> "Login"
                         user.role.isBlank() -> "RoleSelect"          // CHANGED: Google aluth user, Student da Teacher da ahanna
+                        user.role == "admin" -> "AdminHome"            // NEW: admin kenek nam Admin Dashboard ekata
                         user.role == "teacher" && !user.setupDone -> "TeacherSetup"
                         user.role == "teacher" -> "TeacherHome"
                         !user.setupDone -> "StudentSetup"
