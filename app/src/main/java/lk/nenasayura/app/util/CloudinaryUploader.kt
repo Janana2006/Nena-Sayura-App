@@ -19,59 +19,49 @@ object CloudinaryUploader {
 
     private val client = OkHttpClient()
 
-    suspend fun uploadPdf(
+    /** Uploads a PDF or image to Cloudinary and returns its https link. */
+    suspend fun uploadFile(
         context: Context,
         uri: Uri,
-        fileName: String
+        fileName: String,
+        folder: String = ""
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
-            val bytes = context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                inputStream.readBytes()
-            } ?: return@withContext Result.failure(Exception("Could not read PDF bytes from Uri."))
+            val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: return@withContext Result.failure(Exception("Could not read the selected file."))
 
-            val mediaType = "application/pdf".toMediaTypeOrNull()
-            val fileRequestBody = bytes.toRequestBody(mediaType)
+            val mime = context.contentResolver.getType(uri) ?: "application/octet-stream"
+            val body = bytes.toRequestBody(mime.toMediaTypeOrNull())
 
-            val safeFileName = if (fileName.endsWith(".pdf", ignoreCase = true)) fileName else "$fileName.pdf"
-
-            val requestBody = MultipartBody.Builder()
+            val builder = MultipartBody.Builder()
                 .setType(MultipartBody.FORM)
                 .addFormDataPart("upload_preset", UPLOAD_PRESET)
-                .addFormDataPart("file", safeFileName, fileRequestBody)
-                .build()
+                .addFormDataPart("file", fileName, body)
+            if (folder.isNotBlank()) builder.addFormDataPart("folder", folder)
 
-            val request = Request.Builder()
-                .url(UPLOAD_URL)
-                .post(requestBody)
-                .build()
+            val request = Request.Builder().url(UPLOAD_URL).post(builder.build()).build()
 
             val response = client.newCall(request).execute()
-            val responseBodyString = response.body?.string().orEmpty()
+            val text = response.body?.string().orEmpty()
 
             if (response.isSuccessful) {
-                val jsonResponse = JSONObject(responseBodyString)
-                val secureUrl = jsonResponse.optString("secure_url")
-                if (secureUrl.isNotBlank()) {
-                    Result.success(secureUrl)
-                } else {
-                    Result.failure(Exception("Cloudinary response missing 'secure_url'."))
-                }
+                val url = JSONObject(text).optString("secure_url")
+                if (url.isNotBlank()) Result.success(url)
+                else Result.failure(Exception("Cloudinary did not return a link."))
             } else {
-                val errorMessage = if (responseBodyString.isNotBlank()) {
-                    try {
-                        val jsonError = JSONObject(responseBodyString)
-                        val errorObject = jsonError.optJSONObject("error")
-                        errorObject?.optString("message") ?: responseBodyString
-                    } catch (e: Exception) {
-                        responseBodyString
-                    }
-                } else {
-                    "Upload failed with HTTP status ${response.code}"
+                val message = try {
+                    JSONObject(text).optJSONObject("error")?.optString("message") ?: text
+                } catch (e: Exception) {
+                    text
                 }
-                Result.failure(Exception(errorMessage))
+                Result.failure(Exception(message.ifBlank { "Upload failed (HTTP ${response.code})" }))
             }
         } catch (e: Exception) {
             Result.failure(e)
         }
     }
+
+    /** Kept so older code still compiles. */
+    suspend fun uploadPdf(context: Context, uri: Uri, fileName: String): Result<String> =
+        uploadFile(context, uri, fileName)
 }

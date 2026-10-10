@@ -6,13 +6,13 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.AppUser
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Payment
 import lk.nenasayura.app.data.model.StudyStream
+import lk.nenasayura.app.util.CloudinaryUploader
 
 /**
  * Everything the Admin dashboard reads and writes.
@@ -20,7 +20,6 @@ import lk.nenasayura.app.data.model.StudyStream
  */
 class AdminRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val storage: FirebaseStorage = FirebaseStorage.getInstance(),
     private val subjects: SubjectRepository = SubjectRepository()
 ) {
 
@@ -242,12 +241,13 @@ class AdminRepository(
 
     // ---------------- files ----------------
 
-    /** Uploads a file to Firebase Storage and returns its download link. */
+    /** Uploads a file (PDF or image) to Cloudinary and returns its https link. */
     suspend fun uploadFile(folder: String, uri: Uri, fileName: String): String {
+        val context = FirebaseApp.getInstance().applicationContext
         val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val ref = storage.reference.child("$folder/${System.currentTimeMillis()}_$safeName")
-        ref.putFile(uri).await()
-        return ref.downloadUrl.await().toString()
+        return CloudinaryUploader
+            .uploadFile(context, uri, "${System.currentTimeMillis()}_$safeName", "nena_sayura/$folder")
+            .getOrThrow()
     }
 
     // "Combined Maths" -> "combined_maths"
