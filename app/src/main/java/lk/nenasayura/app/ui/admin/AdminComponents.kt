@@ -120,12 +120,70 @@ fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     }
 }
 
+/** Drop-down used to choose a Study Stream. */
+@Composable
+fun StreamDropdown(
+    streams: List<lk.nenasayura.app.data.model.StudyStream>,
+    selected: lk.nenasayura.app.data.model.StudyStream?,
+    enabled: Boolean,
+    onSelect: (lk.nenasayura.app.data.model.StudyStream) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = selected?.name ?: "Select stream",
+                    color = if (selected != null) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (streams.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No streams available. Add them in Streams.") },
+                    onClick = { expanded = false }
+                )
+            } else {
+                streams.forEach { stream ->
+                    DropdownMenuItem(
+                        text = { Text(stream.name) },
+                        onClick = {
+                            onSelect(stream)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** Drop-down used to choose the subject of a paper or a book. */
 @Composable
 fun SubjectDropdown(
     subjects: List<Subject>,
     selected: Subject?,
     enabled: Boolean,
+    placeholder: String = "Select subject",
     onSelect: (Subject) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -145,7 +203,7 @@ fun SubjectDropdown(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = selected?.name ?: "Select subject",
+                    text = selected?.name ?: placeholder,
                     color = if (selected != null) {
                         MaterialTheme.colorScheme.onSurface
                     } else {
@@ -158,16 +216,20 @@ fun SubjectDropdown(
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (subjects.isEmpty()) {
-                DropdownMenuItem(text = { Text("No subjects yet. Add them in Streams.") }, onClick = { expanded = false })
-            }
-            subjects.forEach { subject ->
                 DropdownMenuItem(
-                    text = { Text(subject.name) },
-                    onClick = {
-                        onSelect(subject)
-                        expanded = false
-                    }
+                    text = { Text("No subjects available. Select a stream first.") },
+                    onClick = { expanded = false }
                 )
+            } else {
+                subjects.forEach { subject ->
+                    DropdownMenuItem(
+                        text = { Text(subject.name) },
+                        onClick = {
+                            onSelect(subject)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }

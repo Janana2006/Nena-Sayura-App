@@ -142,7 +142,7 @@ fun PapersSection(state: AdminUiState, viewModel: AdminViewModel) {
 
     if (showAdd) {
         AddPaperDialog(
-            subjects = state.allSubjects,
+            streams = state.streams,
             busy = state.busy,
             viewModel = viewModel,
             onDismiss = { showAdd = false }
@@ -167,7 +167,7 @@ fun PapersSection(state: AdminUiState, viewModel: AdminViewModel) {
 
 @Composable
 private fun AddPaperDialog(
-    subjects: List<Subject>,
+    streams: List<lk.nenasayura.app.data.model.StudyStream>,
     busy: Boolean,
     viewModel: AdminViewModel,
     onDismiss: () -> Unit
@@ -175,10 +175,13 @@ private fun AddPaperDialog(
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("past") }
     var year by remember { mutableStateOf("") }
+    var selectedStream by remember { mutableStateOf<lk.nenasayura.app.data.model.StudyStream?>(null) }
     var subject by remember { mutableStateOf<Subject?>(null) }
     var file by remember { mutableStateOf<PickedFile?>(null) }
     var link by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val availableSubjects = selectedStream?.subjects ?: emptyList()
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -219,8 +222,27 @@ private fun AddPaperDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Text("Stream", style = MaterialTheme.typography.labelLarge)
+                StreamDropdown(
+                    streams = streams,
+                    selected = selectedStream,
+                    enabled = !busy,
+                    onSelect = { newStream ->
+                        selectedStream = newStream
+                        if (subject != null && !newStream.subjects.any { it.id == subject?.id }) {
+                            subject = null
+                        }
+                    }
+                )
+
                 Text("Subject", style = MaterialTheme.typography.labelLarge)
-                SubjectDropdown(subjects, subject, !busy) { subject = it }
+                SubjectDropdown(
+                    subjects = availableSubjects,
+                    selected = subject,
+                    enabled = !busy && selectedStream != null,
+                    placeholder = if (selectedStream == null) "Select a stream first" else "Select subject",
+                    onSelect = { subject = it }
+                )
 
                 FileOrLinkFields(
                     file = file,
@@ -240,8 +262,14 @@ private fun AddPaperDialog(
                 enabled = !busy,
                 onClick = {
                     error = null
-                    viewModel.addPaper(title, subject, year, type, file, link) { err ->
-                        if (err == null) onDismiss() else error = err
+                    if (selectedStream == null) {
+                        error = "Please select a stream"
+                    } else if (subject == null) {
+                        error = "Please select a subject"
+                    } else {
+                        viewModel.addPaper(title, subject, year, type, file, link) { err ->
+                            if (err == null) onDismiss() else error = err
+                        }
                     }
                 }
             ) { Text(if (busy) "Saving…" else "Add") }
