@@ -222,7 +222,7 @@ class AdminViewModel(
         }
     }
 
-    // ---------------- streams and subjects ----------------
+    // ---------------- streams, subjects and kandas ----------------
 
     fun addStream(name: String, onResult: (String?) -> Unit) {
         if (name.isBlank()) return onResult("Enter the stream name.")
@@ -239,10 +239,17 @@ class AdminViewModel(
         }
     }
 
-    fun addSubject(streamId: String, name: String, onResult: (String?) -> Unit) {
+    fun addSubject(streamId: String, name: String, kanda: Int, onResult: (String?) -> Unit) {
         if (name.isBlank()) return onResult("Enter the subject name.")
-        act("Subject added", onResult) {
-            repo.addSubject(streamId, name)
+        act("Subject added to Kanda $kanda", onResult) {
+            repo.addSubject(streamId, name, kanda)
+            refreshStreams()
+        }
+    }
+
+    fun moveSubject(streamId: String, subject: Subject, kanda: Int, onResult: (String?) -> Unit) {
+        act("Moved to Kanda $kanda", onResult) {
+            repo.moveSubject(streamId, subject.id, kanda)
             refreshStreams()
         }
     }

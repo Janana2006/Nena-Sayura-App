@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,15 +39,22 @@ import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.ui.theme.NenaPrimary
 
-// What the admin is doing right now: adding, or confirming a delete
+// What the admin is doing right now: adding, moving, or confirming a delete
 private sealed interface StreamDialog {
     data object AddStream : StreamDialog
-    data class AddSubject(val stream: StudyStream) : StreamDialog
+    data class AddSubject(val stream: StudyStream, val kanda: Int) : StreamDialog
+    data class MoveSubject(val stream: StudyStream, val subject: Subject, val kanda: Int) : StreamDialog
     data class DeleteStream(val stream: StudyStream) : StreamDialog
     data class DeleteSubject(val stream: StudyStream, val subject: Subject) : StreamDialog
 }
 
-/** A/L streams (Maths, Bio ...) and the subjects inside each one. */
+private fun kandaCountOf(stream: StudyStream): Int = maxOf(3, stream.groups.size)
+
+/**
+ * A/L streams (Maths, Bio ...). The subjects of a stream sit in groups 1, 2 and 3.
+ * A student picks one subject from each group: a group with one subject is
+ * compulsory, a group with two or more lets the student choose one.
+ */
 @Composable
 fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
     var dialog by remember { mutableStateOf<StreamDialog?>(null) }
@@ -67,7 +75,7 @@ fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
         if (state.streams.isEmpty()) {
             item {
                 Text(
-                    text = "No streams yet. Add a stream, then add its subjects.",
+                    text = "No streams yet. Add a stream, then add its subjects to Group 1, 2 and 3.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -75,7 +83,12 @@ fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
         }
 
         items(state.streams, key = { it.id }) { stream ->
+            val assignedIds = stream.groups.flatten().map { it.id }.toSet()
+            val unassigned = stream.subjects.filter { it.id !in assignedIds }
+            val hasKandas = assignedIds.isNotEmpty()
+
             AdminCard {
+                // ---- Stream title ----
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -98,29 +111,80 @@ fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
                     }
                 }
 
-                if (stream.subjects.isNotEmpty()) {
+                // ---- Group 1, 2, 3 ----
+                for (index in 0 until kandaCountOf(stream)) {
+                    val kandaNumber = index + 1
+                    val inKanda = stream.groups.getOrNull(index).orEmpty()
+
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                }
-                stream.subjects.forEach { subject ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = subject.name,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { dialog = StreamDialog.DeleteSubject(stream, subject) }) {
-                            Icon(Icons.Filled.Close, contentDescription = "Remove subject")
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Group $kandaNumber",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = NenaPrimary
+                            )
+                            Text(
+                                text = when (inKanda.size) {
+                                    0 -> "No subjects yet"
+                                    1 -> "Compulsory: every student gets this subject"
+                                    else -> "The student chooses one of these"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
+                        TextButton(onClick = { dialog = StreamDialog.AddSubject(stream, kandaNumber) }) {
+                            Icon(Icons.Filled.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Add")
+                        }
+                    }
+                    inKanda.forEach { subject ->
+                        SubjectRow(
+                            name = subject.name,
+                            onMove = { dialog = StreamDialog.MoveSubject(stream, subject, kandaNumber) },
+                            onRemove = { dialog = StreamDialog.DeleteSubject(stream, subject) }
+                        )
                     }
                 }
 
-                TextButton(onClick = { dialog = StreamDialog.AddSubject(stream) }) {
-                    Icon(Icons.Filled.Add, contentDescription = null)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Add subject", color = NenaPrimary)
+                // ---- Subjects that are in no group ----
+                if (unassigned.isNotEmpty()) {
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+                    if (hasKandas) {
+                        Text(
+                            text = "Not in any group",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Text(
+                            text = "Students cannot pick these. Move each one into a group.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "No groups set yet",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Students can pick any 3 of these. Move them into Group 1, 2 and 3 " +
+                                    "to make students choose one subject from each group.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    unassigned.forEach { subject ->
+                        SubjectRow(
+                            name = subject.name,
+                            onMove = { dialog = StreamDialog.MoveSubject(stream, subject, 1) },
+                            onRemove = { dialog = StreamDialog.DeleteSubject(stream, subject) }
+                        )
+                    }
                 }
             }
         }
@@ -137,11 +201,25 @@ fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
             onDismiss = { dialog = null }
         )
 
-        is StreamDialog.AddSubject -> NameDialog(
+        is StreamDialog.AddSubject -> SubjectKandaDialog(
             title = "Add subject to ${d.stream.name}",
-            label = "Subject name (for example Physics)",
+            askName = true,
+            kandaCount = kandaCountOf(d.stream),
+            initialKanda = d.kanda,
+            confirmLabel = "Add",
             busy = state.busy,
-            onSave = { name, done -> viewModel.addSubject(d.stream.id, name, done) },
+            onSave = { name, kanda, done -> viewModel.addSubject(d.stream.id, name, kanda, done) },
+            onDismiss = { dialog = null }
+        )
+
+        is StreamDialog.MoveSubject -> SubjectKandaDialog(
+            title = "Move ${d.subject.name}",
+            askName = false,
+            kandaCount = kandaCountOf(d.stream),
+            initialKanda = d.kanda,
+            confirmLabel = "Move",
+            busy = state.busy,
+            onSave = { _, kanda, done -> viewModel.moveSubject(d.stream.id, d.subject, kanda, done) },
             onDismiss = { dialog = null }
         )
 
@@ -171,6 +249,96 @@ fun StreamsSection(state: AdminUiState, viewModel: AdminViewModel) {
             dismissButton = { TextButton(onClick = { dialog = null }) { Text("Cancel") } }
         )
     }
+}
+
+/** One subject line: its name, a Move button and a remove (x) button. */
+@Composable
+private fun SubjectRow(name: String, onMove: () -> Unit, onRemove: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = name,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.weight(1f)
+        )
+        TextButton(onClick = onMove) { Text("Move") }
+        IconButton(onClick = onRemove) {
+            Icon(Icons.Filled.Close, contentDescription = "Remove subject")
+        }
+    }
+}
+
+/**
+ * Add a subject (with its name) or move one (name hidden): choose the group 1, 2 or 3.
+ * [onSave] reports back null (done) or an error message.
+ */
+@Composable
+private fun SubjectKandaDialog(
+    title: String,
+    askName: Boolean,
+    kandaCount: Int,
+    initialKanda: Int,
+    confirmLabel: String,
+    busy: Boolean,
+    onSave: (String, Int, (String?) -> Unit) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var kanda by remember { mutableStateOf(initialKanda) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text(title) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (askName) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Subject name (for example Physics)") },
+                        singleLine = true,
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Text("Group", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (number in 1..kandaCount) {
+                        FilterChip(
+                            selected = kanda == number,
+                            onClick = { kanda = number },
+                            label = { Text("Group $number") },
+                            enabled = !busy
+                        )
+                    }
+                }
+                Text(
+                    text = "One subject alone in a group is compulsory. Two or more subjects " +
+                            "in a group: the student chooses one of them.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                error?.let {
+                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !busy,
+                onClick = {
+                    error = null
+                    onSave(name, kanda) { err -> if (err == null) onDismiss() else error = err }
+                }
+            ) { Text(if (busy) "Saving…" else confirmLabel) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") } }
+    )
 }
 
 /** A small dialog with one text field. [onSave] reports back null (done) or an error message. */

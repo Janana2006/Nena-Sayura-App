@@ -197,9 +197,24 @@ class AdminRepository(
         db.collection("guideBooks").document(id).delete().await()
     }
 
-    // ---------------- streams and subjects ----------------
+    // ---------------- streams, subjects and kandas ----------------
 
-    suspend fun getStreams(): List<StudyStream> = subjects.getStreams()
+    /**
+     * Streams with their subjects. [StudyStream.groups] holds the kandas: group 0 is
+     * Kanda 1, group 1 is Kanda 2 ... Empty kandas are kept so the position stays stable.
+     */
+    suspend fun getStreams(): List<StudyStream> {
+        val streams = subjects.getStreams()
+        val rawGroups = db.collection("streams").get().await().documents
+            .associate { it.id to it.get("groups") }
+
+        return streams.map { stream ->
+            val byId = stream.subjects.associateBy { it.id }
+            val kandas = readKandas(rawGroups[stream.id]).map { ids -> ids.mapNotNull { byId[it] } }
+            val padding = List(maxOf(0, KANDA_MIN - kandas.size)) { emptyList<lk.nenasayura.app.data.model.Subject>() }
+            stream.copy(groups = kandas + padding)
+        }
+    }
 
     suspend fun addStream(name: String) {
         val id = slug(name)
@@ -223,20 +238,59 @@ class AdminRepository(
         db.collection("streams").document(streamId).delete().await()
     }
 
-    suspend fun addSubject(streamId: String, subjectName: String) {
+    /** Adds a subject to the stream and puts it in Kanda [kanda] (1, 2, 3 ...). */
+    suspend fun addSubject(streamId: String, subjectName: String, kanda: Int) {
         val id = slug(subjectName)
         require(id.isNotEmpty()) { "Enter a valid subject name." }
         val current = subjects.getSubjectsByStream(streamId)
         check(current.none { it.id == id }) { "This subject already exists in the stream." }
+
         val updated = current.associate { it.id to it.name } + (id to subjectName.trim())
-        db.collection("streams").document(streamId).update("subjects", updated).await()
+        val kandas = placeInKanda(loadKandas(streamId), id, kanda)
+        saveStream(streamId, updated, kandas)
+    }
+
+    /** Moves a subject that is already in the stream into Kanda [kanda]. */
+    suspend fun moveSubject(streamId: String, subjectId: String, kanda: Int) {
+        val current = subjects.getSubjectsByStream(streamId).associate { it.id to it.name }
+        check(current.containsKey(subjectId)) { "This subject is no longer in the stream." }
+        saveStream(streamId, current, placeInKanda(loadKandas(streamId), subjectId, kanda))
     }
 
     suspend fun deleteSubject(streamId: String, subjectId: String) {
         val updated = subjects.getSubjectsByStream(streamId)
             .filter { it.id != subjectId }
             .associate { it.id to it.name }
-        db.collection("streams").document(streamId).update("subjects", updated).await()
+        val kandas = loadKandas(streamId).map { ids -> ids.filter { it != subjectId } }
+        saveStream(streamId, updated, kandas)
+    }
+
+    private suspend fun loadKandas(streamId: String): List<List<String>> {
+        val doc = db.collection("streams").document(streamId).get().await()
+        return readKandas(doc.get("groups"))
+    }
+
+    // The student setup reads "groups" as text, one text per kanda, "|" between the options:
+    //   ["combined_maths", "physics", "chemistry|ict"]
+    //   one subject in a kanda = compulsory, two or more = the student chooses one
+    private fun readKandas(raw: Any?): List<List<String>> =
+        (raw as? List<*>)?.map { item ->
+            (item as? String).orEmpty().split("|").map { it.trim() }.filter { it.isNotEmpty() }
+        } ?: emptyList()
+
+    // Takes the subject out of every kanda, then puts it into the chosen one
+    private fun placeInKanda(kandas: List<List<String>>, subjectId: String, kanda: Int): List<List<String>> {
+        val size = maxOf(kandas.size, kanda)
+        return List(size) { index ->
+            val ids = kandas.getOrNull(index).orEmpty().filter { it != subjectId }
+            if (index == kanda - 1) ids + subjectId else ids
+        }
+    }
+
+    private suspend fun saveStream(streamId: String, subjectMap: Map<String, String>, kandas: List<List<String>>) {
+        val groups = kandas.map { it.joinToString("|") }.dropLastWhile { it.isEmpty() }
+        db.collection("streams").document(streamId)
+            .update("subjects", subjectMap, "groups", groups).await()
     }
 
     // ---------------- files ----------------
@@ -257,5 +311,6 @@ class AdminRepository(
     private companion object {
         const val SECOND_APP = "staff-creator"
         const val DEFAULT_COMMISSION = 10.0
+        const val KANDA_MIN = 3
     }
 }
