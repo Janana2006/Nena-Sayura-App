@@ -55,13 +55,14 @@ import lk.nenasayura.app.ui.theme.NenaPrimary
 /** A file chosen from the phone (before it is uploaded). */
 data class PickedFile(val uri: Uri, val name: String)
 
-/** White rounded card, same look as the Teacher screens. */
+/** White rounded card, clean modern look. */
 @Composable
 fun AdminCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp), content = content)
@@ -70,11 +71,12 @@ fun AdminCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.()
 
 @Composable
 fun Pill(text: String, background: Color, textColor: Color) {
-    Surface(shape = RoundedCornerShape(8.dp), color = background) {
+    Surface(shape = RoundedCornerShape(10.dp), color = background) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
             color = textColor
         )
     }
@@ -94,8 +96,9 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        border = BorderStroke(1.dp, Color(0xFFF1F5F9)),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
@@ -110,12 +113,70 @@ fun StatCard(label: String, value: String, modifier: Modifier = Modifier) {
                 fontWeight = FontWeight.Bold,
                 color = NenaPrimary
             )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = Color(0xFF64748B),
                 textAlign = TextAlign.Center
             )
+        }
+    }
+}
+
+/** Drop-down used to choose a Study Stream. */
+@Composable
+fun StreamDropdown(
+    streams: List<lk.nenasayura.app.data.model.StudyStream>,
+    selected: lk.nenasayura.app.data.model.StudyStream?,
+    enabled: Boolean,
+    onSelect: (lk.nenasayura.app.data.model.StudyStream) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = selected?.name ?: "Select stream",
+                    color = if (selected != null) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (streams.isEmpty()) {
+                DropdownMenuItem(
+                    text = { Text("No streams available. Add them in Streams.") },
+                    onClick = { expanded = false }
+                )
+            } else {
+                streams.forEach { stream ->
+                    DropdownMenuItem(
+                        text = { Text(stream.name) },
+                        onClick = {
+                            onSelect(stream)
+                            expanded = false
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -126,6 +187,7 @@ fun SubjectDropdown(
     subjects: List<Subject>,
     selected: Subject?,
     enabled: Boolean,
+    placeholder: String = "Select subject",
     onSelect: (Subject) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -145,7 +207,7 @@ fun SubjectDropdown(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = selected?.name ?: "Select subject",
+                    text = selected?.name ?: placeholder,
                     color = if (selected != null) {
                         MaterialTheme.colorScheme.onSurface
                     } else {
@@ -158,16 +220,20 @@ fun SubjectDropdown(
 
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (subjects.isEmpty()) {
-                DropdownMenuItem(text = { Text("No subjects yet. Add them in Streams.") }, onClick = { expanded = false })
-            }
-            subjects.forEach { subject ->
                 DropdownMenuItem(
-                    text = { Text(subject.name) },
-                    onClick = {
-                        onSelect(subject)
-                        expanded = false
-                    }
+                    text = { Text("No subjects available. Select a stream first.") },
+                    onClick = { expanded = false }
                 )
+            } else {
+                subjects.forEach { subject ->
+                    DropdownMenuItem(
+                        text = { Text(subject.name) },
+                        onClick = {
+                            onSelect(subject)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }

@@ -137,7 +137,7 @@ fun GuideBooksSection(state: AdminUiState, viewModel: AdminViewModel) {
 
     if (showAdd) {
         AddGuideBookDialog(
-            subjects = state.allSubjects,
+            streams = state.streams,
             busy = state.busy,
             viewModel = viewModel,
             onDismiss = { showAdd = false }
@@ -162,7 +162,7 @@ fun GuideBooksSection(state: AdminUiState, viewModel: AdminViewModel) {
 
 @Composable
 private fun AddGuideBookDialog(
-    subjects: List<Subject>,
+    streams: List<lk.nenasayura.app.data.model.StudyStream>,
     busy: Boolean,
     viewModel: AdminViewModel,
     onDismiss: () -> Unit
@@ -170,10 +170,13 @@ private fun AddGuideBookDialog(
     var title by remember { mutableStateOf("") }
     var author by remember { mutableStateOf("") }
     var category by remember { mutableStateOf("guide") }
+    var selectedStream by remember { mutableStateOf<lk.nenasayura.app.data.model.StudyStream?>(null) }
     var subject by remember { mutableStateOf<Subject?>(null) }
     var file by remember { mutableStateOf<PickedFile?>(null) }
     var link by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+
+    val availableSubjects = selectedStream?.subjects ?: emptyList()
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
@@ -212,8 +215,27 @@ private fun AddGuideBookDialog(
                     }
                 }
 
+                Text("Stream", style = MaterialTheme.typography.labelLarge)
+                StreamDropdown(
+                    streams = streams,
+                    selected = selectedStream,
+                    enabled = !busy,
+                    onSelect = { newStream ->
+                        selectedStream = newStream
+                        if (subject != null && !newStream.subjects.any { it.id == subject?.id }) {
+                            subject = null
+                        }
+                    }
+                )
+
                 Text("Subject", style = MaterialTheme.typography.labelLarge)
-                SubjectDropdown(subjects, subject, !busy) { subject = it }
+                SubjectDropdown(
+                    subjects = availableSubjects,
+                    selected = subject,
+                    enabled = !busy && selectedStream != null,
+                    placeholder = if (selectedStream == null) "Select a stream first" else "Select subject",
+                    onSelect = { subject = it }
+                )
 
                 FileOrLinkFields(
                     file = file,
@@ -233,8 +255,14 @@ private fun AddGuideBookDialog(
                 enabled = !busy,
                 onClick = {
                     error = null
-                    viewModel.addGuideBook(title, subject, author, category, file, link) { err ->
-                        if (err == null) onDismiss() else error = err
+                    if (selectedStream == null) {
+                        error = "Please select a stream"
+                    } else if (subject == null) {
+                        error = "Please select a subject"
+                    } else {
+                        viewModel.addGuideBook(title, subject, author, category, file, link) { err ->
+                            if (err == null) onDismiss() else error = err
+                        }
                     }
                 }
             ) { Text(if (busy) "Saving…" else "Add") }
