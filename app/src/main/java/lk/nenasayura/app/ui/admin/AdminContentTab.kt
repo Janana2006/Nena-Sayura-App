@@ -21,12 +21,13 @@ import androidx.compose.ui.unit.dp
 
 private enum class ContentSection(val label: String) {
     Papers("Papers"),
+    MarkingSchemes("Marking Schemes"),
     GuideBooks("Guide Books"),
     Quizzes("Quizzes"),
     Streams("Streams & Subjects")
 }
 
-/** Content tab: add papers, guide books, quizzes, streams and subjects. */
+/** Content tab: add papers, marking schemes, guide books, quizzes, streams and subjects. */
 @Composable
 fun AdminContentTab(
     state: AdminUiState,
@@ -38,7 +39,7 @@ fun AdminContentTab(
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
-        // Scrolls sideways because four chips do not fit on a small phone
+        // Scrolls sideways because the chips do not all fit on a small phone
         Row(
             modifier = Modifier
                 .horizontalScroll(rememberScrollState())
@@ -56,6 +57,7 @@ fun AdminContentTab(
 
         when (section) {
             ContentSection.Papers -> PapersSection(state, viewModel)
+            ContentSection.MarkingSchemes -> MarkingSchemesSection(state)
             ContentSection.GuideBooks -> GuideBooksSection(state, viewModel)
             ContentSection.Quizzes -> QuizzesSection(state)
             ContentSection.Streams -> StreamsSection(state, viewModel)
