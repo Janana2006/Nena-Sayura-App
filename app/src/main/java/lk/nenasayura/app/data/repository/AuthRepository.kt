@@ -2,6 +2,7 @@ package lk.nenasayura.app.data.repository
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
@@ -78,8 +79,26 @@ class AuthRepository(
     fun login(email: String, password: String, onResult: (Result<Unit>) -> Unit) {
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(Unit))
-                else onResult(Result.failure(task.exception ?: Exception("Login failed")))
+                if (task.isSuccessful) {
+                    onResult(Result.success(Unit))
+                    return@addOnCompleteListener
+                }
+
+                val error = task.exception
+                // The Register screen removes spaces from passwords, so the saved password has none.
+                // If the typed password has a space (or the keyboard added one at the end), try again without spaces.
+                val withoutSpaces = password.filter { !it.isWhitespace() }
+                if (error is FirebaseAuthInvalidCredentialsException &&
+                    withoutSpaces.isNotEmpty() && withoutSpaces != password
+                ) {
+                    auth.signInWithEmailAndPassword(email, withoutSpaces)
+                        .addOnCompleteListener { retry ->
+                            if (retry.isSuccessful) onResult(Result.success(Unit))
+                            else onResult(Result.failure(retry.exception ?: error))
+                        }
+                } else {
+                    onResult(Result.failure(error ?: Exception("Login failed")))
+                }
             }
     }
 

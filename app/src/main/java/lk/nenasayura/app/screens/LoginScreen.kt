@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
@@ -49,6 +50,8 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
@@ -185,9 +188,15 @@ fun LoginScreen(
                 Column(modifier = Modifier.padding(20.dp)) {
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        // Emails never contain spaces, so remove any the keyboard adds
+                        onValueChange = { email = it.filter { c -> !c.isWhitespace() } },
                         label = { Text("Email") },
                         leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        // Same keyboard type as the Register screen (no auto-capital / auto-correct)
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next
+                        ),
                         singleLine = true,
                         shape = fieldShape,
                         colors = fieldColors,
@@ -208,6 +217,11 @@ fun LoginScreen(
                             }
                         },
                         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        // Same keyboard type as the Register screen, so the keyboard does not change the password
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
                         singleLine = true,
                         shape = fieldShape,
                         colors = fieldColors,
