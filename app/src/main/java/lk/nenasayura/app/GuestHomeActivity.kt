@@ -12,6 +12,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
+import lk.nenasayura.app.core.browse.QuizBrowseSelection
 import lk.nenasayura.app.navigation.AppNavGraph
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 
@@ -39,10 +40,12 @@ class GuestHomeActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        // The Papers and Guide Books stream choices are temporary: forget them when the user leaves the app
+        // The stream / subject choices (Papers, Marking Schemes, Guide Books, Quizzes) are temporary:
+        // forget them when the user leaves the app
         if (isFinishing) {
-            PaperBrowseSelection.clear()
+            PaperBrowseSelection.clear()   // also used by Marking Schemes
             GuideBrowseSelection.clear()
+            QuizBrowseSelection.clear()
         }
         super.onDestroy()
     }
