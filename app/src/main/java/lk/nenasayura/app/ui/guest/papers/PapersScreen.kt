@@ -102,13 +102,15 @@ fun PapersScreen(
 
 
                     if (state.availableSubjects.isNotEmpty()) {
+                        // No "All" chip: one subject is always selected
                         FilterChipRow(
                             label = "Subject",
                             options = state.availableSubjects,
                             selected = state.availableSubjects
                                 .firstOrNull { it.id == state.selectedSubjectId },
                             optionLabel = { it.name },
-                            onSelected = { viewModel.onSubjectSelected(it?.id) }
+                            onSelected = { subject -> subject?.let { viewModel.onSubjectSelected(it.id) } },
+                            showAll = false
                         )
                     }
                     if (state.availableYears.isNotEmpty()) {
@@ -161,7 +163,7 @@ fun PapersScreen(
                                         subtitle = state.subjectName(paper.subjectId),
                                         badge = paper.type.takeIf { it.isNotBlank() }
                                             ?.let { paperTypeLabel(it) },
-                                        onView = { FileActions.openFile(context, paper.fileUrl) },
+                                        onView = { FileActions.openFile(context, paper.fileUrl, paper.title) },
                                         onDownload = {
                                             FileActions.downloadFile(context, paper.fileUrl, paper.title)
                                         }
