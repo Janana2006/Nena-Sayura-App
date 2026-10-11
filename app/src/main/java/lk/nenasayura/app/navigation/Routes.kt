@@ -19,6 +19,10 @@ object Routes {
     const val PAPERS_LIST = "papers/{category}"
     fun papersRoute(category: String) = "papers/$category"
     const val MARKING_SCHEMES = "marking_schemes"
+    // Student flow: Marking Schemes -> choose stream -> choose subjects -> categories
+    const val MARKING_SCHEME_STREAMS = "marking_scheme_streams"
+    const val MARKING_SCHEME_SUBJECTS = "marking_scheme_subjects/{streamId}"
+    fun markingSchemeSubjectsRoute(streamId: String) = "marking_scheme_subjects/$streamId"
     const val MARKING_SCHEMES_LIST = "marking_schemes/{category}"
     fun markingSchemesRoute(category: String) = "marking_schemes/$category"
 

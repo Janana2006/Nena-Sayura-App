@@ -1,21 +1,24 @@
 package lk.nenasayura.app.ui.guest.markingschemes
 
-
-
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.runtime.Composable
+import lk.nenasayura.app.core.browse.PaperBrowseState
 import lk.nenasayura.app.ui.common.CategoryItem
 import lk.nenasayura.app.ui.common.CategoryScreen
+import lk.nenasayura.app.ui.guest.papers.SelectionSummary
 import lk.nenasayura.app.ui.theme.NenaIconColors
 
 /** Marking Schemes landing page. [onOpenCategory] gets "past", "model" or "provincial". */
 @Composable
 fun MarkingSchemeCategoriesScreen(
     onBack: () -> Unit,
-    onOpenCategory: (category: String) -> Unit
+    onOpenCategory: (category: String) -> Unit,
+    // Students: the stream + subjects they picked (shown on top with a "Change" button).
+    selection: PaperBrowseState? = null,
+    onChangeSelection: (() -> Unit)? = null
 ) {
     CategoryScreen(
         title = "Marking Schemes",
@@ -43,6 +46,9 @@ fun MarkingSchemeCategoriesScreen(
                 onClick = { onOpenCategory("provincial") }
             )
         ),
-        onBack = onBack
+        onBack = onBack,
+        header = if (selection != null && selection.hasSelection && onChangeSelection != null) {
+            { SelectionSummary(selection, onChangeSelection) }
+        } else null
     )
 }

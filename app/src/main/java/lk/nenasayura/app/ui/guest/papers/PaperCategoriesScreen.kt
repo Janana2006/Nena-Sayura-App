@@ -68,7 +68,7 @@ fun PaperCategoriesScreen(
 
 /** Small card: "Maths Stream - Combined Mathematics, Physics" + Change. */
 @Composable
-private fun SelectionSummary(selection: PaperBrowseState, onChange: () -> Unit) {
+internal fun SelectionSummary(selection: PaperBrowseState, onChange: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),

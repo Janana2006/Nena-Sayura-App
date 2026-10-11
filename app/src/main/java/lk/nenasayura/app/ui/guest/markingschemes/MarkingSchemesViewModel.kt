@@ -17,6 +17,7 @@ import lk.nenasayura.app.data.repository.MarkingSchemeRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
 import androidx.lifecycle.SavedStateHandle
 import lk.nenasayura.app.data.model.isInCategory
+import lk.nenasayura.app.core.browse.PaperBrowseSelection
 
 /** Everything the Marking Schemes screen needs to draw itself. */
 data class MarkingSchemesUiState(
@@ -82,12 +83,20 @@ class MarkingSchemesViewModel(savedStateHandle: SavedStateHandle) : ViewModel() 
                     val subjectsJob = async { subjectRepository.getSubjects() }
                     schemesJob.await() to subjectsJob.await()
                 }
+                // Students pick stream + subjects first. null = no restriction (guests).
+                val browse = PaperBrowseSelection.state.value
+                val allowedIds = if (browse.hasSelection) browse.subjectIds else null
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        // Keep only the schemes of the chosen category
-                        schemes = schemes.filter { scheme -> scheme.isInCategory(category) },
-                        subjects = subjects
+                        // Keep only the schemes of the chosen category (and chosen subjects)
+                        schemes = schemes.filter { scheme ->
+                            scheme.isInCategory(category) &&
+                                    (allowedIds == null || scheme.subjectId in allowedIds)
+                        },
+                        subjects = if (allowedIds == null) subjects
+                        else subjects.filter { s -> s.id in allowedIds }
                     )
                 }
             } catch (e: CancellationException) {

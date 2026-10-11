@@ -216,10 +216,60 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             PapersScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.MARKING_SCHEMES) {
-            MarkingSchemeCategoriesScreen(
+            if (session.isStudent) {
+                // Students: stream -> subjects first. Once chosen (this session only) show the categories.
+                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                if (browse.hasSelection) {
+                    MarkingSchemeCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.markingSchemesRoute(category))
+                        },
+                        selection = browse,
+                        onChangeSelection = { navController.navigate(Routes.MARKING_SCHEME_STREAMS) }
+                    )
+                } else {
+                    StreamSelectScreen(
+                        title = "Marking Schemes",
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { streamId ->
+                            navController.navigate(Routes.markingSchemeSubjectsRoute(streamId))
+                        }
+                    )
+                }
+            } else {
+                // Guests: unchanged
+                MarkingSchemeCategoriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(Routes.markingSchemesRoute(category))
+                    }
+                )
+            }
+        }
+        // "Change" button on the categories screen
+        composable(Routes.MARKING_SCHEME_STREAMS) {
+            StreamSelectScreen(
+                title = "Marking Schemes",
                 onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.markingSchemesRoute(category))
+                onStreamSelected = { streamId ->
+                    navController.navigate(Routes.markingSchemeSubjectsRoute(streamId))
+                }
+            )
+        }
+        composable(
+            route = Routes.MARKING_SCHEME_SUBJECTS,
+            arguments = listOf(navArgument("streamId") { type = NavType.StringType })
+        ) {
+            SubjectSelectScreen(
+                title = "Marking Schemes",
+                hint = "Marking schemes will be shown for these subjects only",
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    // Reopen Marking Schemes; it now shows the categories because a selection exists
+                    navController.navigate(Routes.MARKING_SCHEMES) {
+                        popUpTo(Routes.MARKING_SCHEMES) { inclusive = true }
+                    }
                 }
             )
         }
