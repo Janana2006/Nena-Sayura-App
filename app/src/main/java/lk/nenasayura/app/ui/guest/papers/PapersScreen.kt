@@ -2,8 +2,12 @@ package lk.nenasayura.app.ui.guest.papers
 
 
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +25,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,6 +41,8 @@ import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
+import lk.nenasayura.app.ui.theme.NenaPrimary
+import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.util.FileActions
 import lk.nenasayura.app.data.model.paperCategoryTitle
 
@@ -119,38 +128,82 @@ fun PapersScreen(
                             onAction = if (state.hasActiveFilters) viewModel::clearFilters else null
                         )
                     } else {
+                        // Group the papers by year, newest year first. Papers with no year go last.
+                        val papersByYear = visiblePapers
+                            .groupBy { it.year }
+                            .toList()
+                            .sortedByDescending { it.first }
+                        val selectedSubjectName = state.availableSubjects
+                            .firstOrNull { it.id == state.selectedSubjectId }?.name
+
                         LazyColumn(
                             contentPadding = PaddingValues(16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             item {
                                 Text(
-                                    text = "${visiblePapers.size} papers",
+                                    text = listOfNotNull(
+                                        selectedSubjectName,
+                                        "${visiblePapers.size} papers"
+                                    ).joinToString(" • "),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            items(visiblePapers, key = { it.id }) { paper ->
-                                val subtitle = listOfNotNull(
-                                    state.subjectName(paper.subjectId).ifBlank { null },
-                                    paper.year.takeIf { it > 0 }?.toString()
-                                ).joinToString(" • ")
-
-                                DocumentCard(
-                                    title = paper.title,
-                                    subtitle = subtitle,
-                                    badge = paper.type.takeIf { it.isNotBlank() }
-                                        ?.let { paperTypeLabel(it) },
-                                    onView = { FileActions.openFile(context, paper.fileUrl) },
-                                    onDownload = {
-                                        FileActions.downloadFile(context, paper.fileUrl, paper.title)
-                                    }
-                                )
+                            papersByYear.forEach { (year, papersOfYear) ->
+                                item(key = "year-$year") {
+                                    YearHeader(year = year, count = papersOfYear.size)
+                                }
+                                items(papersOfYear, key = { it.id }) { paper ->
+                                    DocumentCard(
+                                        title = paper.title,
+                                        // The year is already in the header above, so show only the subject
+                                        subtitle = state.subjectName(paper.subjectId),
+                                        badge = paper.type.takeIf { it.isNotBlank() }
+                                            ?.let { paperTypeLabel(it) },
+                                        onView = { FileActions.openFile(context, paper.fileUrl) },
+                                        onDownload = {
+                                            FileActions.downloadFile(context, paper.fileUrl, paper.title)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+/** "2021  ----------  3 papers" divider shown above each year's papers. */
+@Composable
+private fun YearHeader(year: Int, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (year > 0) year.toString() else "Year not set",
+            modifier = Modifier
+                .background(NenaPrimaryContainer, RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = NenaPrimary
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.outlineVariant
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = if (count == 1) "1 paper" else "$count papers",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
