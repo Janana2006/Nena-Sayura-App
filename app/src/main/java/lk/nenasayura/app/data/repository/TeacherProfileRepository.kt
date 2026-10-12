@@ -16,8 +16,12 @@ class TeacherProfileRepository(
             return TeacherProfile(uid = uid, name = fallbackName, email = fallbackEmail)
         }
 
+        // A student who later added the teacher role keeps the teaching subject in "teacherStudy"
+        @Suppress("UNCHECKED_CAST")
+        val study = doc.get("teacherStudy") as? Map<String, Any?>
+
         fun stringList(key: String): List<String> =
-            (doc.get(key) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            ((study?.get(key) ?: doc.get(key)) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
         return TeacherProfile(
             uid = uid,
@@ -25,8 +29,8 @@ class TeacherProfileRepository(
             email = doc.getString("email")?.ifBlank { null } ?: fallbackEmail,
             bio = doc.getString("bio") ?: "",
             phone = doc.getString("phone") ?: "",
-            streamId = doc.getString("streamId") ?: "",
-            streamName = doc.getString("streamName") ?: "",
+            streamId = (study?.get("streamId") ?: doc.getString("streamId")) as? String ?: "",
+            streamName = (study?.get("streamName") ?: doc.getString("streamName")) as? String ?: "",
             subjectIds = stringList("subjectIds"),
             subjectNames = stringList("subjectNames"),
             isFree = doc.getBoolean("isFree") ?: true,
@@ -36,16 +40,27 @@ class TeacherProfileRepository(
 
     /** Saves only the fields a teacher may edit; every other field of the document stays as it is. */
     suspend fun updateProfile(profile: TeacherProfile) {
+        val ref = db.collection(USERS).document(profile.uid)
+        val hasOwnStudy = ref.get().await().get("teacherStudy") is Map<*, *>
+
         val data = hashMapOf<String, Any>(
             "name" to profile.name.trim(),
             "bio" to profile.bio.trim(),
             "phone" to profile.phone.trim(),
             "isFree" to profile.isFree,
-            "fee" to (if (profile.isFree) 0 else profile.fee),
-            "subjectIds" to profile.subjectIds,
-            "subjectNames" to profile.subjectNames
+            "fee" to (if (profile.isFree) 0 else profile.fee)
         )
-        db.collection(USERS).document(profile.uid).set(data, SetOptions.merge()).await()
+        if (hasOwnStudy) {
+            // Student + Teacher account: do not touch the student's top-level subjects
+            data["teacherStudy"] = hashMapOf(
+                "subjectIds" to profile.subjectIds,
+                "subjectNames" to profile.subjectNames
+            )
+        } else {
+            data["subjectIds"] = profile.subjectIds
+            data["subjectNames"] = profile.subjectNames
+        }
+        ref.set(data, SetOptions.merge()).await()
     }
 
     private companion object {

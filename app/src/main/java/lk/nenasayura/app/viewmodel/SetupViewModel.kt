@@ -1,15 +1,22 @@
 package lk.nenasayura.app.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.StudyStream
+import lk.nenasayura.app.data.repository.RoleRepository
 import lk.nenasayura.app.data.repository.SetupRepository
 
 data class SetupUiState(
     val role: String = "student",
+    // true = the account already has the other role and this role is being ADDED
+    val addRole: Boolean = false,
+    val isFree: Boolean = true,
+    val fee: Int = 0,
     val loading: Boolean = true,
     val streams: List<StudyStream> = emptyList(),
     val selectedStreamId: String? = null,
@@ -50,15 +57,16 @@ data class SetupUiState(
 }
 
 class SetupViewModel(
-    private val repo: SetupRepository = SetupRepository()
+    private val repo: SetupRepository = SetupRepository(),
+    private val roleRepo: RoleRepository = RoleRepository()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SetupUiState())
     val state: StateFlow<SetupUiState> = _state.asStateFlow()
 
     // Screen eka open wena hama welawema fresh start ekak
-    fun start(role: String = "teacher") {
-        _state.value = SetupUiState(role = role)
+    fun start(role: String = "teacher", addRole: Boolean = false, isFree: Boolean = true, fee: Int = 0) {
+        _state.value = SetupUiState(role = role, addRole = addRole, isFree = isFree, fee = fee)
         loadStreams()
     }
 
@@ -133,6 +141,22 @@ class SetupViewModel(
         }
 
         _state.update { it.copy(saving = true, error = null) }
+
+        if (s.addRole) {
+            // Existing account getting a second role: do not overwrite the first role's details
+            viewModelScope.launch {
+                try {
+                    roleRepo.addRole(s.role, stream, chosen, s.isFree, s.fee)
+                    _state.update { it.copy(saving = false, done = true) }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    _state.update { it.copy(saving = false, error = e.localizedMessage ?: "Failed to save") }
+                }
+            }
+            return
+        }
+
         repo.saveSetup(s.role, stream, chosen) { result ->
             result.fold(
                 onSuccess = { _state.update { it.copy(saving = false, done = true) } },

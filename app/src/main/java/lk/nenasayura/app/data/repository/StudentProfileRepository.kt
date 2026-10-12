@@ -45,8 +45,12 @@ class StudentProfileRepository(
             }
         }
 
+        // A teacher who later added the student role keeps the student's stream in "studentStudy"
+        @Suppress("UNCHECKED_CAST")
+        val study = doc.get("studentStudy") as? Map<String, Any?>
+
         fun stringList(key: String): List<String> =
-            (doc.get(key) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+            ((study?.get(key) ?: doc.get(key)) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
         return StudentProfile(
             uid = user.uid,
@@ -56,8 +60,8 @@ class StudentProfileRepository(
             school = doc.getString("school") ?: "",
             district = doc.getString("district") ?: "",
             examYear = (doc.getLong("examYear") ?: 0L).toInt(),
-            streamId = doc.getString("streamId") ?: "",
-            streamName = doc.getString("streamName") ?: "",
+            streamId = (study?.get("streamId") ?: doc.getString("streamId")) as? String ?: "",
+            streamName = (study?.get("streamName") ?: doc.getString("streamName")) as? String ?: "",
             subjectIds = stringList("subjectIds"),
             subjectNames = stringList("subjectNames"),
             isGoogleAccount = user.isGoogle()

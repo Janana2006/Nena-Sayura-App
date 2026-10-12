@@ -24,6 +24,7 @@ import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
 import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
+import lk.nenasayura.app.ui.common.applyActiveRole
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
@@ -93,6 +94,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             navController.navigate(homeRoute) {
                 popUpTo(Routes.GUEST_HOME) { inclusive = true }
             }
+        } else if (homeRoute != null && onRoleHome && currentRoute != homeRoute) {
+            // The user switched role (Student <-> Teacher) from the Profile tab: open the other dashboard
+            navController.navigate(homeRoute) {
+                popUpTo(currentRoute!!) { inclusive = true }
+            }
         } else if (homeRoute == null && onRoleHome) {
             navController.navigate(Routes.GUEST_HOME) {
                 popUpTo(currentRoute!!) { inclusive = true }
@@ -134,6 +140,12 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenReviews = { navController.navigate(Routes.REVIEWS) },
                     onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
                 ),
+                // Teacher dashboard ekata switch (session eka wenas wenakota LaunchedEffect eka navigate karanawa)
+                onRoleChanged = { role ->
+                    PaperBrowseSelection.clear()
+                    GuideBrowseSelection.clear()
+                    applyActiveRole(role)
+                },
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
                     PaperBrowseSelection.clear()
@@ -147,6 +159,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Routes.TEACHER_HOME) {
             TeacherHomeScreen(
+                // Student dashboard ekata switch
+                onRoleChanged = { role -> applyActiveRole(role) },
                 onSignOut = {
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()

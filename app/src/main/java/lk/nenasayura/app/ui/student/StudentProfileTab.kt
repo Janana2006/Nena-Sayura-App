@@ -51,6 +51,7 @@ import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.data.model.StudentProfile
 import lk.nenasayura.app.ui.common.LoadingView
+import lk.nenasayura.app.ui.common.RoleSwitchCard
 import lk.nenasayura.app.ui.student.profile.ChangeEmailScreen
 import lk.nenasayura.app.ui.student.profile.ChangePasswordScreen
 import lk.nenasayura.app.ui.student.profile.EditStudyScreen
@@ -79,6 +80,7 @@ fun StudentProfileTab(
     email: String,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
+    onRoleChanged: (String) -> Unit = {},
     viewModel: StudentProfileViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -153,7 +155,8 @@ fun StudentProfileTab(
                 onOpen = { pageIndex = it.ordinal },
                 onLockedClick = { viewModel.showMessage(GOOGLE_NOTE) },
                 onRetry = { viewModel.load() },
-                onSignOut = onSignOut
+                onSignOut = onSignOut,
+                onRoleChanged = onRoleChanged
             )
         }
 
@@ -171,7 +174,8 @@ private fun ProfileOverview(
     onOpen: (ProfilePage) -> Unit,
     onLockedClick: () -> Unit,
     onRetry: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onRoleChanged: (String) -> Unit
 ) {
     val personalSubtitle = listOf(profile.school, profile.district)
         .filter { it.isNotBlank() }
@@ -261,6 +265,9 @@ private fun ProfileOverview(
                     palette = NenaIconColors.MarkingSchemes
                 )
             }
+
+            // ---------- Teacher dashboard (switch, or become a teacher too) ----------
+            RoleSwitchCard(currentRole = "student", onRoleChanged = onRoleChanged)
 
             Spacer(modifier = Modifier.size(4.dp))
             OutlinedButton(
