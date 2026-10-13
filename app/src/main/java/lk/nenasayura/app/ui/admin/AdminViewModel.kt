@@ -9,10 +9,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.data.model.AppUser
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Payment
+import lk.nenasayura.app.data.model.StaffRole
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.AdminRepository
@@ -31,6 +33,8 @@ data class TeacherSummary(
 data class AdminUiState(
     val checking: Boolean = true,
     val accessDenied: Boolean = false,
+    /** What the logged-in admin may open. Empty until the role check finishes. */
+    val access: Set<AdminPermission> = emptySet(),
     val loading: Boolean = true,
     val users: List<AppUser> = emptyList(),
     val payments: List<Payment> = emptyList(),
@@ -43,6 +47,9 @@ data class AdminUiState(
     /** One-time message shown in a snackbar. */
     val message: String? = null
 ) {
+    fun can(permission: AdminPermission): Boolean = permission in access
+    val canSeeContent: Boolean get() = access.any { it in AdminPermission.CONTENT }
+
     val students: List<AppUser> get() = users.filter { it.isStudent }
     val teachers: List<AppUser> get() = users.filter { it.isTeacher }
     val staff: List<AppUser> get() = users.filter { it.isAdmin }
@@ -83,24 +90,24 @@ class AdminViewModel(
     private var startedFor: String? = null
     private val loadErrors = mutableListOf<String>()
 
-    /** Called once when the Admin Home opens: checks the role, then loads everything. */
+    /** Called once when the Admin Home opens: checks the role + access, then loads everything. */
     fun start(uid: String) {
         if (startedFor == uid) return
         startedFor = uid
         viewModelScope.launch {
-            val isAdmin = try {
-                repo.isAdmin(uid)
+            val access = try {
+                repo.getAdminAccess(uid)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Log.w(TAG, "Role check failed: ${e.localizedMessage}")
-                false
+                null
             }
-            if (!isAdmin) {
+            if (access == null) {
                 _state.update { it.copy(checking = false, accessDenied = true, loading = false) }
                 return@launch
             }
-            _state.update { it.copy(checking = false) }
+            _state.update { it.copy(checking = false, access = access) }
             loadAll()
         }
     }
@@ -261,19 +268,46 @@ class AdminViewModel(
 
     // ---------------- staff ----------------
 
-    fun addStaff(name: String, email: String, password: String, onResult: (String?) -> Unit) {
+    fun addStaff(
+        name: String,
+        email: String,
+        password: String,
+        role: StaffRole,
+        permissions: Set<AdminPermission>,
+        onResult: (String?) -> Unit
+    ) {
         val error = when {
+            !_state.value.can(AdminPermission.STAFF) -> "You do not have access to add staff."
             name.isBlank() -> "Enter the name."
             !email.contains("@") || !email.contains(".") -> "Enter a valid email."
             password.length < 6 -> "The password must be at least 6 characters."
+            permissions.isEmpty() -> "Tick at least one access."
             else -> null
         }
         if (error != null) {
             onResult(error)
             return
         }
+        // A staff member can only hand out access they have themselves
+        val allowed = permissions.intersect(_state.value.access)
         act("Staff member added", onResult) {
-            repo.createStaff(name, email, password)
+            repo.createStaff(name, email, password, role.key, allowed)
+            val users = repo.getUsers()
+            _state.update { it.copy(users = users) }
+        }
+    }
+
+    fun updateStaffAccess(
+        member: AppUser,
+        role: StaffRole,
+        permissions: Set<AdminPermission>,
+        onResult: (String?) -> Unit
+    ) {
+        if (!_state.value.can(AdminPermission.STAFF)) return onResult("You do not have access to edit staff.")
+        if (permissions.isEmpty()) return onResult("Tick at least one access.")
+        val allowed = permissions.intersect(_state.value.access)
+        act("Access updated", onResult) {
+            repo.updateStaffAccess(member.uid, role.key, allowed)
             val users = repo.getUsers()
             _state.update { it.copy(users = users) }
         }

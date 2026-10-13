@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
+import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.data.model.AppUser
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Paper
@@ -31,6 +32,17 @@ class AdminRepository(
         return doc.getString("role") == "admin"
     }
 
+    /**
+     * What this admin may open. null = not an admin at all.
+     * Old admin accounts have no "permissions" field, so they get full access.
+     */
+    suspend fun getAdminAccess(uid: String): Set<AdminPermission>? {
+        val doc = db.collection("users").document(uid).get().await()
+        if (doc.getString("role") != "admin") return null
+        val keys = (doc.get("permissions") as? List<*>)?.filterIsInstance<String>()
+        return AdminPermission.fromKeys(keys)
+    }
+
     // ---------------- users ----------------
 
     suspend fun getUsers(): List<AppUser> =
@@ -45,7 +57,9 @@ class AdminRepository(
                     fee = (doc.getLong("fee") ?: 0L).toInt(),
                     streamName = doc.getString("streamName") ?: "",
                     subjectNames = (doc.get("subjectNames") as? List<*>)
-                        ?.filterIsInstance<String>() ?: emptyList()
+                        ?.filterIsInstance<String>() ?: emptyList(),
+                    staffRole = doc.getString("staffRole") ?: "",
+                    permissions = (doc.get("permissions") as? List<*>)?.filterIsInstance<String>()
                 )
             }
             .sortedBy { it.name.lowercase() }
@@ -55,7 +69,13 @@ class AdminRepository(
      * A normal createUser call would sign in as the new user, so a second
      * FirebaseApp instance is used just for creating the account.
      */
-    suspend fun createStaff(name: String, email: String, password: String) {
+    suspend fun createStaff(
+        name: String,
+        email: String,
+        password: String,
+        staffRole: String,
+        permissions: Set<AdminPermission>
+    ) {
         val secondAuth = secondaryAuth()
         val created = secondAuth.createUserWithEmailAndPassword(email.trim(), password).await()
         val user = created.user ?: throw IllegalStateException("Could not create the account.")
@@ -67,6 +87,8 @@ class AdminRepository(
                     "name" to name.trim(),
                     "email" to email.trim(),
                     "role" to "admin",
+                    "staffRole" to staffRole,
+                    "permissions" to permissions.map { it.key },
                     "setupDone" to true,
                     "isFree" to true,
                     "fee" to 0,
@@ -80,6 +102,16 @@ class AdminRepository(
         } finally {
             secondAuth.signOut()
         }
+    }
+
+    /** Changes the role and access of an existing staff member. */
+    suspend fun updateStaffAccess(uid: String, staffRole: String, permissions: Set<AdminPermission>) {
+        db.collection("users").document(uid).update(
+            mapOf(
+                "staffRole" to staffRole,
+                "permissions" to permissions.map { it.key }
+            )
+        ).await()
     }
 
     private fun secondaryAuth(): FirebaseAuth {

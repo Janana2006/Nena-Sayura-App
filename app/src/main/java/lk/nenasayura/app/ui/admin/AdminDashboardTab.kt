@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
@@ -98,65 +99,78 @@ fun AdminDashboardTab(
         }
 
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
-            // ---- Counts ----
+            // ---- Counts (only what this admin has access to) ----
             val freeTeachers = state.teachers.count { it.isFree }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Students", state.students.size.toString(), Modifier.weight(1f))
-                StatCard("Teachers", state.teachers.size.toString(), Modifier.weight(1f))
-                StatCard("Staff", state.staff.size.toString(), Modifier.weight(1f))
+            val stats = buildList {
+                if (state.can(AdminPermission.USERS)) {
+                    add("Students" to state.students.size.toString())
+                    add("Teachers" to state.teachers.size.toString())
+                }
+                if (state.can(AdminPermission.STAFF)) add("Staff" to state.staff.size.toString())
+                if (state.can(AdminPermission.USERS)) {
+                    add("Free teachers" to freeTeachers.toString())
+                    add("Paid teachers" to (state.teachers.size - freeTeachers).toString())
+                }
+                if (state.can(AdminPermission.STREAMS)) add("Streams" to state.streams.size.toString())
+                if (state.can(AdminPermission.PAPERS)) add("Papers" to state.papers.size.toString())
+                if (state.can(AdminPermission.GUIDE_BOOKS)) add("Guide books" to state.guideBooks.size.toString())
+                if (state.can(AdminPermission.PAYMENTS)) add("Payments" to state.paidPayments.size.toString())
             }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Free teachers", freeTeachers.toString(), Modifier.weight(1f))
-                StatCard("Paid teachers", (state.teachers.size - freeTeachers).toString(), Modifier.weight(1f))
-                StatCard("Streams", state.streams.size.toString(), Modifier.weight(1f))
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("Papers", state.papers.size.toString(), Modifier.weight(1f))
-                StatCard("Guide books", state.guideBooks.size.toString(), Modifier.weight(1f))
-                StatCard("Payments", state.paidPayments.size.toString(), Modifier.weight(1f))
+            stats.chunked(3).forEachIndexed { index, rowItems ->
+                if (index > 0) Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    rowItems.forEach { (label, value) -> StatCard(label, value, Modifier.weight(1f)) }
+                    repeat(3 - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
             }
 
             // ---- Earnings ----
-            Spacer(modifier = Modifier.height(24.dp))
-            SectionTitle("Earnings")
-            Spacer(modifier = Modifier.height(12.dp))
-            AdminCard {
-                MoneyRow("Paid by students", money(state.gross))
-                Spacer(modifier = Modifier.height(8.dp))
-                MoneyRow("Your commission (${percentText(state.commissionPercent)}%)", money(state.commission), NenaSecondary)
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(10.dp))
-                MoneyRow("Paid out to teachers", money(state.teachersTotal), bold = true)
+            if (state.can(AdminPermission.PAYMENTS)) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionTitle("Earnings")
+                Spacer(modifier = Modifier.height(12.dp))
+                AdminCard {
+                    MoneyRow("Paid by students", money(state.gross))
+                    Spacer(modifier = Modifier.height(8.dp))
+                    MoneyRow("Your commission (${percentText(state.commissionPercent)}%)", money(state.commission), NenaSecondary)
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MoneyRow("Paid out to teachers", money(state.teachersTotal), bold = true)
+                }
             }
 
             // ---- Shortcuts ----
+            val tiles = buildList<Triple<String, ImageVector, () -> Unit>> {
+                if (state.can(AdminPermission.USERS)) add(Triple("Users", Icons.Filled.People, onOpenUsers))
+                if (state.can(AdminPermission.PAYMENTS)) add(Triple("Payments", Icons.Filled.Payments, onOpenPayments))
+                if (state.canSeeContent) add(Triple("Content", Icons.Filled.Folder, onOpenContent))
+                add(Triple("Profile", Icons.Filled.AdminPanelSettings, onOpenStaff)) // always shown
+            }
             Spacer(modifier = Modifier.height(24.dp))
             SectionTitle("Quick access")
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ShortcutTile("Users", Icons.Filled.People, onOpenUsers, Modifier.weight(1f))
-                ShortcutTile("Payments", Icons.Filled.Payments, onOpenPayments, Modifier.weight(1f))
-                ShortcutTile("Content", Icons.Filled.Folder, onOpenContent, Modifier.weight(1f))
-                ShortcutTile("Profile", Icons.Filled.AdminPanelSettings, onOpenStaff, Modifier.weight(1f))
+                tiles.forEach { (label, icon, onClick) -> ShortcutTile(label, icon, onClick, Modifier.weight(1f)) }
+                repeat(4 - tiles.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
 
             // ---- Latest payments ----
-            Spacer(modifier = Modifier.height(24.dp))
-            SectionTitle("Latest payments")
-            Spacer(modifier = Modifier.height(12.dp))
-            if (state.payments.isEmpty()) {
-                Text(
-                    text = "No payments yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                state.payments.take(5).forEach { payment ->
-                    PaymentRow(payment)
-                    Spacer(modifier = Modifier.height(8.dp))
+            if (state.can(AdminPermission.PAYMENTS)) {
+                Spacer(modifier = Modifier.height(24.dp))
+                SectionTitle("Latest payments")
+                Spacer(modifier = Modifier.height(12.dp))
+                if (state.payments.isEmpty()) {
+                    Text(
+                        text = "No payments yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    state.payments.take(5).forEach { payment ->
+                        PaymentRow(payment)
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
             }
         }

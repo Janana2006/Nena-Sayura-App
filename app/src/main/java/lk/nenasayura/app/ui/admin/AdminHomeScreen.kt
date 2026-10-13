@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
+import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
@@ -48,6 +49,14 @@ private enum class AdminTab(val label: String, val title: String, val icon: Imag
     Payments("Payments", "Payments", Icons.Filled.Payments),
     Content("Content", "Manage Content", Icons.Filled.Folder),
     Profile("Profile", "My Profile", Icons.Filled.AccountCircle)
+}
+
+/** Which tabs this admin may see. Home and Profile (sign out lives there) are always shown. */
+private fun AdminTab.visibleFor(access: Set<AdminPermission>): Boolean = when (this) {
+    AdminTab.Home, AdminTab.Profile -> true
+    AdminTab.Users -> AdminPermission.USERS in access
+    AdminTab.Payments -> AdminPermission.PAYMENTS in access
+    AdminTab.Content -> access.any { it in AdminPermission.CONTENT }
 }
 
 /**
@@ -74,9 +83,10 @@ fun AdminHomeScreen(
         }
     }
 
-    var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
-    val selectedTab = AdminTab.entries[selectedIndex]
-    BackHandler(enabled = selectedTab != AdminTab.Home) { selectedIndex = 0 }
+    var selectedIndex by rememberSaveable { mutableIntStateOf(0) } // ordinal of the tab
+    // A tab this admin has no access to falls back to Home
+    val selectedTab = AdminTab.entries[selectedIndex].takeIf { it.visibleFor(state.access) } ?: AdminTab.Home
+    BackHandler(enabled = selectedTab != AdminTab.Home) { selectedIndex = AdminTab.Home.ordinal }
 
     val ready = !state.checking && !state.accessDenied && !state.loading
 
@@ -97,10 +107,10 @@ fun AdminHomeScreen(
         bottomBar = {
             if (ready) {
                 NavigationBar {
-                    AdminTab.entries.forEachIndexed { index, tab ->
+                    AdminTab.entries.filter { it.visibleFor(state.access) }.forEach { tab ->
                         NavigationBarItem(
-                            selected = index == selectedIndex,
-                            onClick = { selectedIndex = index },
+                            selected = tab == selectedTab,
+                            onClick = { selectedIndex = tab.ordinal },
                             icon = { Icon(imageVector = tab.icon, contentDescription = tab.label) },
                             label = { Text(tab.label) },
                             colors = NavigationBarItemDefaults.colors(

@@ -18,13 +18,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import lk.nenasayura.app.data.model.AdminPermission
 
-private enum class ContentSection(val label: String) {
-    Papers("Papers"),
-    MarkingSchemes("Marking Schemes"),
-    GuideBooks("Guide Books"),
-    Quizzes("Quizzes"),
-    Streams("Streams & Subjects")
+private enum class ContentSection(val label: String, val permission: AdminPermission) {
+    Papers("Papers", AdminPermission.PAPERS),
+    MarkingSchemes("Marking Schemes", AdminPermission.MARKING_SCHEMES),
+    GuideBooks("Guide Books", AdminPermission.GUIDE_BOOKS),
+    Quizzes("Quizzes", AdminPermission.QUIZZES),
+    Streams("Streams & Subjects", AdminPermission.STREAMS)
 }
 
 /** Content tab: add papers, marking schemes, guide books, quizzes, streams and subjects. */
@@ -34,8 +35,12 @@ fun AdminContentTab(
     viewModel: AdminViewModel,
     modifier: Modifier = Modifier
 ) {
-    var sectionIndex by rememberSaveable { mutableIntStateOf(0) }
-    val section = ContentSection.entries[sectionIndex]
+    // Only the sections this admin was given access to
+    val sections = ContentSection.entries.filter { state.can(it.permission) }
+    var sectionIndex by rememberSaveable { mutableIntStateOf(0) } // ordinal of the section
+    val section = ContentSection.entries[sectionIndex].takeIf { it in sections }
+        ?: sections.firstOrNull()
+        ?: return
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
@@ -46,10 +51,10 @@ fun AdminContentTab(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            ContentSection.entries.forEachIndexed { index, s ->
+            sections.forEach { s ->
                 FilterChip(
-                    selected = index == sectionIndex,
-                    onClick = { sectionIndex = index },
+                    selected = s == section,
+                    onClick = { sectionIndex = s.ordinal },
                     label = { Text(s.label) }
                 )
             }
