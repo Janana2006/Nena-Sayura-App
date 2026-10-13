@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AdminPanelSettings
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
@@ -47,7 +47,7 @@ private enum class AdminTab(val label: String, val title: String, val icon: Imag
     Users("Users", "Students & Teachers", Icons.Filled.People),
     Payments("Payments", "Payments", Icons.Filled.Payments),
     Content("Content", "Manage Content", Icons.Filled.Folder),
-    Staff("Staff", "Staff & Account", Icons.Filled.AdminPanelSettings)
+    Profile("Profile", "My Profile", Icons.Filled.AccountCircle)
 }
 
 /**
@@ -82,8 +82,8 @@ fun AdminHomeScreen(
 
     Scaffold(
         topBar = {
-            // The Home tab draws its own gradient header
-            if (ready && selectedTab != AdminTab.Home) {
+            // The Home and Profile tabs draw their own gradient header
+            if (ready && selectedTab != AdminTab.Home && selectedTab != AdminTab.Profile) {
                 NenaTopBar(
                     title = selectedTab.title,
                     actions = {
@@ -136,7 +136,7 @@ fun AdminHomeScreen(
                         onOpenUsers = { selectedIndex = AdminTab.Users.ordinal },
                         onOpenPayments = { selectedIndex = AdminTab.Payments.ordinal },
                         onOpenContent = { selectedIndex = AdminTab.Content.ordinal },
-                        onOpenStaff = { selectedIndex = AdminTab.Staff.ordinal },
+                        onOpenStaff = { selectedIndex = AdminTab.Profile.ordinal },
                         onRefresh = viewModel::reload,
                         modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                     )
@@ -159,11 +159,12 @@ fun AdminHomeScreen(
                         modifier = Modifier.padding(innerPadding)
                     )
 
-                    AdminTab.Staff -> AdminStaffTab(
+                    // Profile goes edge to edge at the top, like Home
+                    AdminTab.Profile -> AdminProfileTab(
                         state = state,
                         viewModel = viewModel,
                         onSignOut = onSignOut,
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                     )
                 }
             }

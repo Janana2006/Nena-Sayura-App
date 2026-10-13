@@ -140,7 +140,7 @@ fun AdminDashboardTab(
                 ShortcutTile("Users", Icons.Filled.People, onOpenUsers, Modifier.weight(1f))
                 ShortcutTile("Payments", Icons.Filled.Payments, onOpenPayments, Modifier.weight(1f))
                 ShortcutTile("Content", Icons.Filled.Folder, onOpenContent, Modifier.weight(1f))
-                ShortcutTile("Staff", Icons.Filled.AdminPanelSettings, onOpenStaff, Modifier.weight(1f))
+                ShortcutTile("Profile", Icons.Filled.AdminPanelSettings, onOpenStaff, Modifier.weight(1f))
             }
 
             // ---- Latest payments ----
