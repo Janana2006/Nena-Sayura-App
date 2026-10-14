@@ -11,7 +11,6 @@ data class Paper(
     val type: String = "",
     val fileUrl: String = "",
     /** 1, 2 or 3 for Provincial papers; 0 when the paper has no term. */
-    val term: Int = 0
 )
 
 /** "1st Term", "2nd Term", "3rd Term", or an empty string when there is no term. */
