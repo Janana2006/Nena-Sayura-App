@@ -13,8 +13,10 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import lk.nenasayura.app.core.browse.StudentStudySync
 import lk.nenasayura.app.core.session.FirebaseSessionProvider
 import lk.nenasayura.app.data.model.StudentProfile
 import lk.nenasayura.app.data.repository.StudentProfileRepository
@@ -39,6 +41,11 @@ class StudentProfileViewModel(
 
     init {
         load()
+        // The student changed the stream/subjects from Papers, Marking Schemes or Guide Books:
+        // reload so the profile tab shows the new choice
+        viewModelScope.launch {
+            StudentStudySync.version.drop(1).collect { load() }
+        }
     }
 
     fun load(message: String? = null) {

@@ -15,7 +15,7 @@ import lk.nenasayura.app.ui.theme.NenaIconColors
 fun GuideBookCategoriesScreen(
     onBack: () -> Unit,
     onOpenCategory: (category: String) -> Unit,
-    // Students: the stream they picked (shown on top with a "Change" button).
+    // Students: their stream + subjects (shown on top with a "Change" button).
     selection: GuideBrowseState? = null,
     onChangeSelection: (() -> Unit)? = null
 ) {
@@ -43,7 +43,7 @@ fun GuideBookCategoriesScreen(
             {
                 StreamSummaryCard(
                     streamName = selection.streamName,
-                    details = "${selection.subjects.size} subjects",
+                    details = selection.subjects.joinToString(", ") { it.name },
                     onChange = onChangeSelection
                 )
             }
