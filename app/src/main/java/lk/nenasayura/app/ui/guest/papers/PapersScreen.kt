@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.paperTypeLabel
+import lk.nenasayura.app.data.model.termLabel
 import lk.nenasayura.app.ui.common.DocumentCard
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.ErrorView
@@ -157,10 +158,17 @@ fun PapersScreen(
                                     YearHeader(year = year, count = papersOfYear.size)
                                 }
                                 items(papersOfYear, key = { it.id }) { paper ->
+                                    // The year is already in the header above, so show the subject,
+                                    // and the province + term for Provincial papers
+                                    val subtitle = listOfNotNull(
+                                        state.subjectName(paper.subjectId).ifBlank { null },
+                                        paper.province.ifBlank { null },
+                                        termLabel(paper.term).ifBlank { null }
+                                    ).joinToString(" • ")
+
                                     DocumentCard(
                                         title = paper.title,
-                                        // The year is already in the header above, so show only the subject
-                                        subtitle = state.subjectName(paper.subjectId),
+                                        subtitle = subtitle,
                                         badge = paper.type.takeIf { it.isNotBlank() }
                                             ?.let { paperTypeLabel(it) },
                                         onView = { FileActions.openFile(context, paper.fileUrl, paper.title) },

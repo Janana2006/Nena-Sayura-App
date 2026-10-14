@@ -172,13 +172,14 @@ class AdminRepository(
                     },
                     type = doc.getString("type") ?: "",
                     fileUrl = doc.getString("fileUrl") ?: "",
-                    term = (doc.get("term") as? Number)?.toInt() ?: 0   // NEW
+                    term = (doc.get("term") as? Number)?.toInt() ?: 0,
+                    province = doc.getString("province") ?: ""
                 )
             }
             .sortedWith(compareByDescending<Paper> { it.year }.thenBy { it.title })
 
-    /** [type] = "past", "model" or "provincial". [term] (1-3) is only saved for provincial papers. */
-    suspend fun addPaper(title: String, subjectId: String, year: Int, type: String, fileUrl: String, term: Int = 0) {   // NEW: term
+    /** [type] = "past", "model" or "provincial". [term] (1-3) and [province] are only saved for provincial papers. */
+    suspend fun addPaper(title: String, subjectId: String, year: Int, type: String, fileUrl: String, term: Int = 0, province: String = "") {
         val data = mutableMapOf<String, Any>(
             "title" to title.trim(),
             "subjectId" to subjectId,
@@ -187,7 +188,8 @@ class AdminRepository(
             "fileUrl" to fileUrl,
             "createdAt" to FieldValue.serverTimestamp()
         )
-        if (type == "provincial" && term in 1..3) data["term"] = term   // NEW
+        if (type == "provincial" && term in 1..3) data["term"] = term
+        if (type == "provincial" && province.isNotBlank()) data["province"] = province
         db.collection("papers").add(data).await()
     }
 

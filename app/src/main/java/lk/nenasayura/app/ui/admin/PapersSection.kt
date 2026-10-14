@@ -47,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import lk.nenasayura.app.data.model.PROVINCES
 import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.isInCategory
@@ -120,6 +121,7 @@ fun PapersSection(state: AdminUiState, viewModel: AdminViewModel) {
                             val sub = listOf(
                                 state.subjectName(paper.subjectId),
                                 if (paper.year > 0) paper.year.toString() else "",
+                                paper.province,
                                 termLabel(paper.term)
                             ).filter { it.isNotBlank() }.joinToString(" • ")
                             Text(
@@ -185,6 +187,7 @@ private fun AddPaperDialog(
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("past") }
     var term by remember { mutableStateOf(0) } // 0 = not chosen, 1-3 = term
+    var province by remember { mutableStateOf("") } // "" = not chosen
     var year by remember { mutableStateOf("") }
     var selectedStream by remember { mutableStateOf<lk.nenasayura.app.data.model.StudyStream?>(null) }
     var subject by remember { mutableStateOf<Subject?>(null) }
@@ -218,7 +221,10 @@ private fun AddPaperDialog(
                             selected = type == key,
                             onClick = {
                                 type = key
-                                if (key != "provincial") term = 0
+                                if (key != "provincial") {
+                                    term = 0
+                                    province = ""
+                                }
                             },
                             label = { Text(label) },
                             enabled = !busy
@@ -226,8 +232,15 @@ private fun AddPaperDialog(
                     }
                 }
 
-                // Term is only needed for Provincial papers
+                // Province and Term are only needed for Provincial papers
                 if (type == "provincial") {
+                    Text("Province", style = MaterialTheme.typography.labelLarge)
+                    ProvinceDropdown(
+                        selected = province,
+                        enabled = !busy,
+                        onSelect = { province = it }
+                    )
+
                     Text("Term", style = MaterialTheme.typography.labelLarge)
                     TermDropdown(
                         selected = term,
@@ -286,14 +299,16 @@ private fun AddPaperDialog(
                 enabled = !busy,
                 onClick = {
                     error = null
-                    if (type == "provincial" && term == 0) {
+                    if (type == "provincial" && province.isBlank()) {
+                        error = "Please select a province"
+                    } else if (type == "provincial" && term == 0) {
                         error = "Please select a term"
                     } else if (selectedStream == null) {
                         error = "Please select a stream"
                     } else if (subject == null) {
                         error = "Please select a subject"
                     } else {
-                        viewModel.addPaper(title, subject, year, type, term, file, link) { err ->
+                        viewModel.addPaper(title, subject, year, type, term, province, file, link) { err ->
                             if (err == null) onDismiss() else error = err
                         }
                     }
@@ -345,6 +360,55 @@ private fun TermDropdown(
                     text = { Text(termLabel(t)) },
                     onClick = {
                         onSelect(t)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+/** Drop-down used to choose the province of a Provincial paper. */
+@Composable
+private fun ProvinceDropdown(
+    selected: String,       // "" = nothing chosen yet
+    enabled: Boolean,
+    onSelect: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (selected.isNotBlank()) selected else "Select province",
+                    color = if (selected.isNotBlank()) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            PROVINCES.forEach { name ->
+                DropdownMenuItem(
+                    text = { Text(name) },
+                    onClick = {
+                        onSelect(name)
                         expanded = false
                     }
                 )
