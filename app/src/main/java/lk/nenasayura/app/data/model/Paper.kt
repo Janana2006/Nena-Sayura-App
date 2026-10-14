@@ -13,20 +13,7 @@ data class Paper(
     /** 1, 2 or 3 for Provincial papers; 0 when the paper has no term. */
     val term: Int = 0,
     /** Province name for Provincial papers (one of [PROVINCES]); empty when not set. */
-    val province: String = ""
-)
 
-/** The nine provinces of Sri Lanka, as stored on a Provincial paper. */
-val PROVINCES = listOf(
-    "Western",
-    "Central",
-    "Southern",
-    "Northern",
-    "Eastern",
-    "North Western",
-    "North Central",
-    "Uva",
-    "Sabaragamuwa"
 )
 
 /** "1st Term", "2nd Term", "3rd Term", or an empty string when there is no term. */
