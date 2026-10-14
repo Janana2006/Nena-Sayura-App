@@ -82,6 +82,17 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     val subjectsJob = async { subjectRepository.getSubjects() }
                     booksJob.await() to subjectsJob.await()
                 }
+
+                // DEBUG: see this in Logcat (filter: GuideDebug). Remove after the problem is found.
+                android.util.Log.d(
+                    "GuideDebug",
+                    "category=$category subjectId=$subjectId total=${books.size} " +
+                            "categories=${books.map { it.category }} " +
+                            "bookSubjectIds=${books.map { it.subjectId }} " +
+                            "inThisCategory=${books.count { it.isInCategory(category) }} " +
+                            "inCategoryAndSubject=${books.count { it.isInCategory(category) && (subjectId == null || it.subjectId == subjectId) }}"
+                )
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
