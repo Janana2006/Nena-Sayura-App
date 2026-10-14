@@ -124,6 +124,28 @@ fun PapersScreen(
                         )
                     }
 
+                    // Province and Term filters are only for Provincial papers
+                    if (viewModel.category == "provincial") {
+                        if (state.availableProvinces.isNotEmpty()) {
+                            FilterChipRow(
+                                label = "Province",
+                                options = state.availableProvinces,
+                                selected = state.selectedProvince,
+                                optionLabel = { it },
+                                onSelected = viewModel::onProvinceSelected
+                            )
+                        }
+                        if (state.availableTerms.isNotEmpty()) {
+                            FilterChipRow(
+                                label = "Term",
+                                options = state.availableTerms,
+                                selected = state.selectedTerm,
+                                optionLabel = { termLabel(it) },
+                                onSelected = viewModel::onTermSelected
+                            )
+                        }
+                    }
+
                     if (visiblePapers.isEmpty()) {
                         EmptyView(
                             message = "No papers match your filters.",

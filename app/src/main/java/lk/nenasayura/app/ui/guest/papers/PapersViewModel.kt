@@ -27,6 +27,8 @@ data class PapersUiState(
     val selectedSubjectId: String? = null,
     val selectedType: String? = null,
     val selectedYear: Int? = null,
+    val selectedProvince: String? = null,   // Provincial papers only
+    val selectedTerm: Int? = null,          // Provincial papers only (1-3)
     val query: String = ""
 ) {
     fun subjectName(subjectId: String): String =
@@ -42,6 +44,18 @@ data class PapersUiState(
             .filter { selectedSubjectId == null || it.subjectId == selectedSubjectId }
             .map { it.year }.filter { it > 0 }.distinct().sortedDescending()
 
+    // Only the provinces that the selected subject has papers for
+    val availableProvinces: List<String>
+        get() = papers
+            .filter { selectedSubjectId == null || it.subjectId == selectedSubjectId }
+            .map { it.province }.filter { it.isNotBlank() }.distinct().sorted()
+
+    // Only the terms (1-3) that the selected subject has papers for
+    val availableTerms: List<Int>
+        get() = papers
+            .filter { selectedSubjectId == null || it.subjectId == selectedSubjectId }
+            .map { it.term }.filter { it in 1..3 }.distinct().sorted()
+
     val availableSubjects: List<Subject>
         get() {
             val usedIds = papers.map { it.subjectId }.toSet()
@@ -50,7 +64,8 @@ data class PapersUiState(
 
     // The subject is always selected (there is no "All" chip), so it does not count as a filter
     val hasActiveFilters: Boolean
-        get() = selectedType != null || selectedYear != null || query.isNotBlank()
+        get() = selectedType != null || selectedYear != null ||
+                selectedProvince != null || selectedTerm != null || query.isNotBlank()
 
     val filteredPapers: List<Paper>
         get() {
@@ -59,6 +74,8 @@ data class PapersUiState(
                 (selectedSubjectId == null || paper.subjectId == selectedSubjectId) &&
                         (selectedType == null || paper.type == selectedType) &&
                         (selectedYear == null || paper.year == selectedYear) &&
+                        (selectedProvince == null || paper.province == selectedProvince) &&
+                        (selectedTerm == null || paper.term == selectedTerm) &&
                         (text.isEmpty() ||
                                 paper.title.contains(text, ignoreCase = true) ||
                                 subjectName(paper.subjectId).contains(text, ignoreCase = true))
@@ -130,14 +147,29 @@ class PapersViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     }
 
     fun onQueryChange(value: String) = _uiState.update { it.copy(query = value) }
-    // Changing the subject also clears the year, because the years differ for each subject
+    // Changing the subject also clears the year, province and term, because they differ for each subject
     fun onSubjectSelected(subjectId: String?) =
-        _uiState.update { it.copy(selectedSubjectId = subjectId, selectedYear = null) }
+        _uiState.update {
+            it.copy(
+                selectedSubjectId = subjectId,
+                selectedYear = null,
+                selectedProvince = null,
+                selectedTerm = null
+            )
+        }
     fun onTypeSelected(type: String?) = _uiState.update { it.copy(selectedType = type) }
     fun onYearSelected(year: Int?) = _uiState.update { it.copy(selectedYear = year) }
+    fun onProvinceSelected(province: String?) = _uiState.update { it.copy(selectedProvince = province) }
+    fun onTermSelected(term: Int?) = _uiState.update { it.copy(selectedTerm = term) }
 
-    // Clears type, year and search. The selected subject stays.
+    // Clears type, year, province, term and search. The selected subject stays.
     fun clearFilters() = _uiState.update {
-        it.copy(selectedType = null, selectedYear = null, query = "")
+        it.copy(
+            selectedType = null,
+            selectedYear = null,
+            selectedProvince = null,
+            selectedTerm = null,
+            query = ""
+        )
     }
 }
