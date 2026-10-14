@@ -9,8 +9,18 @@ data class Paper(
     val subjectId: String = "",
     val year: Int = 0,
     val type: String = "",
-    val fileUrl: String = ""
+    val fileUrl: String = "",
+    /** 1, 2 or 3 for Provincial papers; 0 when the paper has no term. */
+    val term: Int = 0
 )
+
+/** "1st Term", "2nd Term", "3rd Term", or an empty string when there is no term. */
+fun termLabel(term: Int): String = when (term) {
+    1 -> "1st Term"
+    2 -> "2nd Term"
+    3 -> "3rd Term"
+    else -> ""
+}
 
 /** Human-friendly name for the stored paper type value. */
 fun paperTypeLabel(type: String): String = when (type.lowercase()) {

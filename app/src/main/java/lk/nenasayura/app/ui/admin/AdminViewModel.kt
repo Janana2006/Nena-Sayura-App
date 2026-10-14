@@ -162,6 +162,7 @@ class AdminViewModel(
         subject: Subject?,
         yearText: String,
         type: String,
+        term: Int,                      // NEW
         file: PickedFile?,
         link: String,
         onResult: (String?) -> Unit
@@ -171,6 +172,7 @@ class AdminViewModel(
             title.isBlank() -> "Enter a title."
             subject == null -> "Choose a subject."
             year == null || year < 1990 || year > 2100 -> "Enter a valid year (for example 2024)."
+            type == "provincial" && term !in 1..3 -> "Choose a term (1st, 2nd or 3rd)."   // NEW
             file == null && !isLink(link) -> "Choose a file, or paste a link that starts with https://"
             else -> null
         }
@@ -180,7 +182,7 @@ class AdminViewModel(
         }
         act("Paper added", onResult) {
             val url = if (file != null) repo.uploadFile("papers/$type", file.uri, file.name) else link.trim()
-            repo.addPaper(title, subject.id, year, type, url)
+            repo.addPaper(title, subject.id, year, type, url, term)   // NEW: term
             val papers = repo.getPapers()
             _state.update { it.copy(papers = papers) }
         }

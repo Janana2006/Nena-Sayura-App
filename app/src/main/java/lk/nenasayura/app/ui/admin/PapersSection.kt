@@ -1,6 +1,8 @@
 package lk.nenasayura.app.ui.admin
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -8,23 +10,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -43,6 +51,7 @@ import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.isInCategory
 import lk.nenasayura.app.data.model.paperTypeLabel
+import lk.nenasayura.app.data.model.termLabel
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
@@ -110,7 +119,8 @@ fun PapersSection(state: AdminUiState, viewModel: AdminViewModel) {
                             )
                             val sub = listOf(
                                 state.subjectName(paper.subjectId),
-                                if (paper.year > 0) paper.year.toString() else ""
+                                if (paper.year > 0) paper.year.toString() else "",
+                                termLabel(paper.term)
                             ).filter { it.isNotBlank() }.joinToString(" • ")
                             Text(
                                 text = sub,
@@ -174,6 +184,7 @@ private fun AddPaperDialog(
 ) {
     var title by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("past") }
+    var term by remember { mutableStateOf(0) } // 0 = not chosen, 1-3 = term
     var year by remember { mutableStateOf("") }
     var selectedStream by remember { mutableStateOf<lk.nenasayura.app.data.model.StudyStream?>(null) }
     var subject by remember { mutableStateOf<Subject?>(null) }
@@ -205,11 +216,24 @@ private fun AddPaperDialog(
                     PAPER_CATEGORIES.forEach { (key, label) ->
                         FilterChip(
                             selected = type == key,
-                            onClick = { type = key },
+                            onClick = {
+                                type = key
+                                if (key != "provincial") term = 0
+                            },
                             label = { Text(label) },
                             enabled = !busy
                         )
                     }
+                }
+
+                // Term is only needed for Provincial papers
+                if (type == "provincial") {
+                    Text("Term", style = MaterialTheme.typography.labelLarge)
+                    TermDropdown(
+                        selected = term,
+                        enabled = !busy,
+                        onSelect = { term = it }
+                    )
                 }
 
                 OutlinedTextField(
@@ -262,12 +286,14 @@ private fun AddPaperDialog(
                 enabled = !busy,
                 onClick = {
                     error = null
-                    if (selectedStream == null) {
+                    if (type == "provincial" && term == 0) {
+                        error = "Please select a term"
+                    } else if (selectedStream == null) {
                         error = "Please select a stream"
                     } else if (subject == null) {
                         error = "Please select a subject"
                     } else {
-                        viewModel.addPaper(title, subject, year, type, file, link) { err ->
+                        viewModel.addPaper(title, subject, year, type, term, file, link) { err ->
                             if (err == null) onDismiss() else error = err
                         }
                     }
@@ -276,4 +302,53 @@ private fun AddPaperDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancel") } }
     )
+}
+
+/** Drop-down used to choose the term (1st, 2nd or 3rd) of a Provincial paper. */
+@Composable
+private fun TermDropdown(
+    selected: Int,          // 0 = nothing chosen yet
+    enabled: Boolean,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    Box {
+        Surface(
+            onClick = { expanded = true },
+            enabled = enabled,
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surface,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (selected in 1..3) termLabel(selected) else "Select term",
+                    color = if (selected in 1..3) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    }
+                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
+            }
+        }
+
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            (1..3).forEach { t ->
+                DropdownMenuItem(
+                    text = { Text(termLabel(t)) },
+                    onClick = {
+                        onSelect(t)
+                        expanded = false
+                    }
+                )
+            }
+        }
+    }
 }
