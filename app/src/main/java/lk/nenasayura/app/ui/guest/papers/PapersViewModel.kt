@@ -109,8 +109,13 @@ class PapersViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     papersJob.await() to subjectsJob.await()
                 }
                 // Students pick stream + subjects first. null = no restriction (guests).
+                // Model papers are NOT limited by that choice, so every model paper
+                // the admin adds is shown to the student.
                 val browse = PaperBrowseSelection.state.value
-                val allowedIds = if (browse.hasSelection) browse.subjectIds else null
+                val allowedIds =
+                    if (category.equals("model", ignoreCase = true)) null
+                    else if (browse.hasSelection) browse.subjectIds
+                    else null
 
                 // Keep only the papers of the chosen category (and chosen subjects)
                 val categoryPapers = papers.filter { paper ->
