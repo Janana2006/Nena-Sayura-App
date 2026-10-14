@@ -16,15 +16,20 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
+import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
+import lk.nenasayura.app.core.browse.QuizBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
 import lk.nenasayura.app.core.session.isTeacher
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
+import lk.nenasayura.app.ui.common.applyActiveRole
 import lk.nenasayura.app.ui.guest.GuestHomeScreen
 import lk.nenasayura.app.ui.guest.LoginPlaceholderScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBooksScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideStreamSelectScreen
+import lk.nenasayura.app.ui.guest.guidebooks.GuideSubjectsScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemesScreen
 import lk.nenasayura.app.ui.guest.papers.PapersScreen
 import lk.nenasayura.app.ui.guest.quizzes.QuizListScreen
@@ -38,6 +43,8 @@ import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
 import lk.nenasayura.app.ui.student.QuickAccessScreen
 import lk.nenasayura.app.ui.student.papers.StreamSelectScreen
 import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
+import lk.nenasayura.app.ui.student.quizzes.QuizStreamSelectScreen
+import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
@@ -87,6 +94,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             navController.navigate(homeRoute) {
                 popUpTo(Routes.GUEST_HOME) { inclusive = true }
             }
+        } else if (homeRoute != null && onRoleHome && currentRoute != homeRoute) {
+            // The user switched role (Student <-> Teacher) from the Profile tab: open the other dashboard
+            navController.navigate(homeRoute) {
+                popUpTo(currentRoute!!) { inclusive = true }
+            }
         } else if (homeRoute == null && onRoleHome) {
             navController.navigate(Routes.GUEST_HOME) {
                 popUpTo(currentRoute!!) { inclusive = true }
@@ -128,9 +140,16 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenReviews = { navController.navigate(Routes.REVIEWS) },
                     onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
                 ),
+                // Teacher dashboard ekata switch (session eka wenas wenakota LaunchedEffect eka navigate karanawa)
+                onRoleChanged = { role ->
+                    PaperBrowseSelection.clear()
+                    GuideBrowseSelection.clear()
+                    applyActiveRole(role)
+                },
                 // Sign out kalama Firebase eken logout wela Login ekata yanawa
                 onSignOut = {
                     PaperBrowseSelection.clear()
+                    GuideBrowseSelection.clear()
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
                     openLoginAfterSignOut()
@@ -140,6 +159,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Routes.TEACHER_HOME) {
             TeacherHomeScreen(
+                // Student dashboard ekata switch
+                onRoleChanged = { role -> applyActiveRole(role) },
                 onSignOut = {
                     FirebaseAuth.getInstance().signOut()
                     AppSession.provider.signOut()
@@ -209,10 +230,60 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             PapersScreen(onBack = { navController.popBackStack() })
         }
         composable(Routes.MARKING_SCHEMES) {
-            MarkingSchemeCategoriesScreen(
+            if (session.isStudent) {
+                // Students: stream -> subjects first. Once chosen (this session only) show the categories.
+                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                if (browse.hasSelection) {
+                    MarkingSchemeCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.markingSchemesRoute(category))
+                        },
+                        selection = browse,
+                        onChangeSelection = { navController.navigate(Routes.MARKING_SCHEME_STREAMS) }
+                    )
+                } else {
+                    StreamSelectScreen(
+                        title = "Marking Schemes",
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { streamId ->
+                            navController.navigate(Routes.markingSchemeSubjectsRoute(streamId))
+                        }
+                    )
+                }
+            } else {
+                // Guests: unchanged
+                MarkingSchemeCategoriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(Routes.markingSchemesRoute(category))
+                    }
+                )
+            }
+        }
+        // "Change" button on the categories screen
+        composable(Routes.MARKING_SCHEME_STREAMS) {
+            StreamSelectScreen(
+                title = "Marking Schemes",
                 onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.markingSchemesRoute(category))
+                onStreamSelected = { streamId ->
+                    navController.navigate(Routes.markingSchemeSubjectsRoute(streamId))
+                }
+            )
+        }
+        composable(
+            route = Routes.MARKING_SCHEME_SUBJECTS,
+            arguments = listOf(navArgument("streamId") { type = NavType.StringType })
+        ) {
+            SubjectSelectScreen(
+                title = "Marking Schemes",
+                hint = "Marking schemes will be shown for these subjects only",
+                onBack = { navController.popBackStack() },
+                onDone = {
+                    // Reopen Marking Schemes; it now shows the categories because a selection exists
+                    navController.navigate(Routes.MARKING_SCHEMES) {
+                        popUpTo(Routes.MARKING_SCHEMES) { inclusive = true }
+                    }
                 }
             )
         }
@@ -222,21 +293,95 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         ) {
             MarkingSchemesScreen(onBack = { navController.popBackStack() })
         }
+
+        // ---------- Guide Books ----------
         composable(Routes.GUIDE_BOOKS) {
-            GuideBookCategoriesScreen(
-                onBack = { navController.popBackStack() },
-                onOpenCategory = { category ->
-                    navController.navigate(Routes.guideBooksRoute(category))
+            if (session.isStudent) {
+                // Students: choose a stream first (this session only), then the categories
+                val guideBrowse by GuideBrowseSelection.state.collectAsStateWithLifecycle()
+                if (guideBrowse.hasSelection) {
+                    GuideBookCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.guideBooksRoute(category))
+                        },
+                        selection = guideBrowse,
+                        onChangeSelection = { GuideBrowseSelection.clear() }
+                    )
+                } else {
+                    GuideStreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { stream -> GuideBrowseSelection.select(stream) }
+                    )
                 }
-            )
+            } else {
+                // Guests: unchanged
+                GuideBookCategoriesScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenCategory = { category ->
+                        navController.navigate(Routes.guideBooksRoute(category))
+                    }
+                )
+            }
         }
         composable(
             route = Routes.GUIDE_BOOKS_LIST,
-            arguments = listOf(navArgument("category") { type = NavType.StringType })
-        ) {
-            GuideBooksScreen(onBack = { navController.popBackStack() })
+            arguments = listOf(
+                navArgument("category") { type = NavType.StringType },
+                navArgument("subjectId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
+            val category = entry.arguments?.getString("category") ?: "guide"
+            val subjectId = entry.arguments?.getString("subjectId")
+            if (session.isStudent && subjectId == null) {
+                // Students: the subjects of their stream
+                GuideSubjectsScreen(
+                    category = category,
+                    onBack = { navController.popBackStack() },
+                    onOpenSubject = { selectedSubId ->
+                        navController.navigate(Routes.guideBooksRoute(category, selectedSubId))
+                    }
+                )
+            } else {
+                // Guests or students with a chosen subject
+                GuideBooksScreen(onBack = { navController.popBackStack() })
+            }
         }
+
         composable(Routes.QUIZZES) {
+            if (session.isStudent) {
+                // Students: choose a stream first (this session only), then choose a subject
+                val quizBrowse by QuizBrowseSelection.state.collectAsStateWithLifecycle()
+                if (quizBrowse.hasSelection) {
+                    QuizSubjectSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onChangeStream = { QuizBrowseSelection.clear() },
+                        onSubjectSelected = { subjectId ->
+                            navController.navigate(Routes.quizzesBySubjectRoute(subjectId))
+                        }
+                    )
+                } else {
+                    QuizStreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { stream -> QuizBrowseSelection.select(stream) }
+                    )
+                }
+            } else {
+                // Guests: open all quizzes with subject filter chip
+                QuizListScreen(
+                    onBack = { navController.popBackStack() },
+                    onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
+                )
+            }
+        }
+        composable(
+            route = Routes.QUIZZES_BY_SUBJECT,
+            arguments = listOf(navArgument("subjectId") { type = NavType.StringType })
+        ) {
             QuizListScreen(
                 onBack = { navController.popBackStack() },
                 onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }

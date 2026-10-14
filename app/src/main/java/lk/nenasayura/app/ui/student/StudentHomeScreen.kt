@@ -57,7 +57,8 @@ private enum class StudentTab(val label: String, val title: String, val icon: Im
 @Composable
 fun StudentHomeScreen(
     actions: StudentHomeActions,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onRoleChanged: (String) -> Unit = {}
 ) {
     val session by currentSession()
     val loggedIn = session as? UserSession.LoggedIn
@@ -119,6 +120,7 @@ fun StudentHomeScreen(
                 name = name,
                 email = email,
                 onSignOut = onSignOut,
+                onRoleChanged = onRoleChanged,
                 modifier = Modifier.padding(innerPadding)
             )
         }

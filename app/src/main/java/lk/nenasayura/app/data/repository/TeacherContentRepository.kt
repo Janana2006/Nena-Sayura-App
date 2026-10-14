@@ -1,23 +1,23 @@
 package lk.nenasayura.app.data.repository
 
 import android.net.Uri
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.AccessType
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherContent
+import lk.nenasayura.app.util.CloudinaryUploader
 
 /**
- * Teacher uploads: the file goes to Firebase Storage, the details go to the
+ * Teacher uploads: the file goes to Cloudinary, the details go to the
  * Firestore "teacher_content" collection.
  */
 class TeacherContentRepository(
-    private val db: FirebaseFirestore = FirebaseFirestore.getInstance(),
-    private val storage: FirebaseStorage = FirebaseStorage.getInstance()
+    private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
     /** Everything one teacher has uploaded, newest first. */
@@ -45,15 +45,19 @@ class TeacherContentRepository(
         videoUrl: String
     ) {
         var fileUrl = ""
-        var storagePath = ""
 
-        // 1) Files (not video links) go to Firebase Storage first.
+        // 1) Files (not video links) go to Cloudinary first.
         if (type != ContentType.VIDEO_LINK && fileUri != null) {
+            val context = FirebaseApp.getInstance().applicationContext
             val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
-            storagePath = "teacher_content/$teacherId/${System.currentTimeMillis()}_$safeName"
-            val ref = storage.reference.child(storagePath)
-            ref.putFile(fileUri).await()
-            fileUrl = ref.downloadUrl.await().toString()
+            fileUrl = CloudinaryUploader
+                .uploadFile(
+                    context,
+                    fileUri,
+                    "${System.currentTimeMillis()}_$safeName",
+                    "nena_sayura/teacher_content/$teacherId"
+                )
+                .getOrThrow()
         }
 
         // 2) Save the details in Firestore.
@@ -68,7 +72,7 @@ class TeacherContentRepository(
             "access" to access.key,
             "fileUrl" to fileUrl,
             "fileName" to fileName,
-            "storagePath" to storagePath,
+            "storagePath" to "",
             "videoUrl" to videoUrl.trim(),
             "createdAt" to FieldValue.serverTimestamp()
         )
@@ -86,16 +90,12 @@ class TeacherContentRepository(
         ).await()
     }
 
-    /** Deletes the Firestore record and (if there is one) the file in Storage. */
+    /**
+     * Deletes the Firestore record. The file on Cloudinary is not removed
+     * (that needs the API secret); delete it by hand in the Media Library if needed.
+     */
     suspend fun delete(content: TeacherContent) {
         db.collection(COLLECTION).document(content.id).delete().await()
-        if (content.storagePath.isNotBlank()) {
-            try {
-                storage.reference.child(content.storagePath).delete().await()
-            } catch (e: Exception) {
-                // The record is already gone; a leftover file is harmless, so don't fail.
-            }
-        }
     }
 
     // If the real field names differ, change them here only.

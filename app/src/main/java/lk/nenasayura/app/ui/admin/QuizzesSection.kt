@@ -1,7 +1,9 @@
 package lk.nenasayura.app.ui.admin
 
 import android.widget.Toast
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,16 +18,23 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -34,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,26 +57,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.AdminQuiz
 import lk.nenasayura.app.data.model.NewQuestion
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
+import lk.nenasayura.app.ui.theme.NenaBackground
+import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSecondary
 
-// What the admin is doing: making a new quiz, or adding questions to one that exists
 private sealed interface BuilderMode {
     data object New : BuilderMode
     data class AddTo(val quiz: AdminQuiz) : BuilderMode
 }
 
-// One question while it is being typed. [key] keeps each card stable in the list.
 private data class QuestionDraft(
     val key: Int,
     val text: String = "",
@@ -76,8 +89,7 @@ private data class QuestionDraft(
 )
 
 /**
- * Quizzes: pick the stream and subject, type the lesson name, then add as many
- * questions as you like. Every question has 5 answers and a tick on the right one.
+ * Quizzes: filter by stream & subject, view and search quizzes, add new ones with questions.
  */
 @Composable
 fun QuizzesSection(
@@ -88,6 +100,10 @@ fun QuizzesSection(
     val context = LocalContext.current
     var builder by remember { mutableStateOf<BuilderMode?>(null) }
     var deleting by remember { mutableStateOf<AdminQuiz?>(null) }
+
+    var selectedStream by remember { mutableStateOf<StudyStream?>(null) }
+    var selectedSubject by remember { mutableStateOf<Subject?>(null) }
+    var query by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) { quizVm.loadOnce() }
 
@@ -107,81 +123,327 @@ fun QuizzesSection(
         return
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        item {
-            Button(onClick = { builder = BuilderMode.New }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add quiz")
-            }
-        }
+    // Helper functions
+    fun streamForSubject(subjectId: String): StudyStream? {
+        return state.streams.firstOrNull { stream -> stream.subjects.any { it.id == subjectId } }
+    }
 
-        ui.loadError?.let { message ->
-            item {
-                Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
+    fun countForStream(stream: StudyStream?): Int {
+        if (stream == null) return ui.quizzes.size
+        val subjectIds = stream.subjects.map { it.id }.toSet()
+        return ui.quizzes.count { it.subjectId in subjectIds }
+    }
 
-        if (ui.loading && ui.quizzes.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) { CircularProgressIndicator() }
-            }
-        } else if (ui.quizzes.isEmpty() && ui.loadError == null) {
-            item {
-                Text(
-                    text = "No quizzes yet. Tap Add quiz to make the first one.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+    fun countForSubject(subject: Subject?): Int {
+        if (subject == null) return countForStream(selectedStream)
+        return ui.quizzes.count { it.subjectId == subject.id }
+    }
 
-        items(ui.quizzes, key = { it.id }) { quiz ->
-            AdminCard {
-                Text(
-                    text = quiz.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val count = if (quiz.questionCount >= 0) {
-                    "${quiz.questionCount} question${if (quiz.questionCount == 1) "" else "s"}"
-                } else ""
-                val sub = listOf(state.subjectName(quiz.subjectId), count)
-                    .filter { it.isNotBlank() }
-                    .joinToString(" • ")
-                Text(
-                    text = sub,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically
+    val streamFilteredQuizzes = if (selectedStream == null) {
+        ui.quizzes
+    } else {
+        val streamSubjectIds = selectedStream!!.subjects.map { it.id }.toSet()
+        ui.quizzes.filter { it.subjectId in streamSubjectIds }
+    }
+
+    val subjectFilteredQuizzes = if (selectedSubject == null) {
+        streamFilteredQuizzes
+    } else {
+        streamFilteredQuizzes.filter { it.subjectId == selectedSubject!!.id }
+    }
+
+    val shown = subjectFilteredQuizzes.filter { quiz ->
+        query.isBlank() ||
+                quiz.title.contains(query, ignoreCase = true) ||
+                quiz.description.contains(query, ignoreCase = true) ||
+                state.subjectName(quiz.subjectId).contains(query, ignoreCase = true)
+    }
+
+    Column(modifier = Modifier.fillMaxSize().background(NenaBackground)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // ---- Add Quiz Button ----
+            item {
+                Button(
+                    onClick = { builder = BuilderMode.New },
+                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().height(50.dp)
                 ) {
-                    TextButton(onClick = { builder = BuilderMode.AddTo(quiz) }) {
-                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Add questions")
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Add Quiz", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            // ---- Streams Horizontal Filter Bar ----
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Filter by Stream",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF64748B)
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            val isSelected = selectedStream == null
+                            val count = ui.quizzes.size
+                            FilterPill(
+                                label = "All Streams",
+                                count = count,
+                                isSelected = isSelected,
+                                onClick = {
+                                    selectedStream = null
+                                    selectedSubject = null
+                                }
+                            )
+                        }
+                        items(state.streams, key = { it.id }) { stream ->
+                            val isSelected = selectedStream?.id == stream.id
+                            val count = countForStream(stream)
+                            FilterPill(
+                                label = stream.name,
+                                count = count,
+                                isSelected = isSelected,
+                                onClick = {
+                                    if (selectedStream?.id == stream.id) {
+                                        selectedStream = null
+                                        selectedSubject = null
+                                    } else {
+                                        selectedStream = stream
+                                        selectedSubject = null
+                                    }
+                                }
+                            )
+                        }
                     }
-                    IconButton(onClick = { deleting = quiz }) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = "Delete quiz",
-                            tint = MaterialTheme.colorScheme.error
+                }
+            }
+
+            // ---- Subjects Horizontal Filter Bar (when a Stream is selected) ----
+            if (selectedStream != null && selectedStream!!.subjects.isNotEmpty()) {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Subjects in ${selectedStream!!.name}",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = NenaPrimary
                         )
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                val isSelected = selectedSubject == null
+                                val count = countForStream(selectedStream)
+                                FilterPill(
+                                    label = "All Subjects",
+                                    count = count,
+                                    isSelected = isSelected,
+                                    accent = true,
+                                    onClick = { selectedSubject = null }
+                                )
+                            }
+                            items(selectedStream!!.subjects, key = { it.id }) { subject ->
+                                val isSelected = selectedSubject?.id == subject.id
+                                val count = countForSubject(subject)
+                                FilterPill(
+                                    label = subject.name,
+                                    count = count,
+                                    isSelected = isSelected,
+                                    accent = true,
+                                    onClick = {
+                                        selectedSubject = if (selectedSubject?.id == subject.id) null else subject
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ---- Search Box ----
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = {
+                        Text("Search quiz by title or lesson...", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                    },
+                    leadingIcon = {
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = NenaPrimary)
+                    },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color(0xFF64748B))
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = Color.White,
+                        unfocusedContainerColor = Color.White,
+                        focusedBorderColor = NenaPrimary,
+                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            // ---- Load Error or Spinner ----
+            ui.loadError?.let { message ->
+                item {
+                    Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            if (ui.loading && ui.quizzes.isEmpty()) {
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        contentAlignment = Alignment.Center
+                    ) { CircularProgressIndicator(color = NenaPrimary) }
+                }
+            } else if (shown.isEmpty() && ui.loadError == null) {
+                item {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFEFF6FF)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Quiz, contentDescription = null, tint = NenaPrimary, modifier = Modifier.size(30.dp))
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = if (query.isNotBlank()) "No quizzes match \"$query\"" else "No quizzes found in this selection.",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF334155),
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Tap Add quiz above to create a new quiz.",
+                                fontSize = 13.sp,
+                                color = Color(0xFF64748B),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else {
+                items(shown, key = { it.id }) { quiz ->
+                    val stream = streamForSubject(quiz.subjectId)
+                    val subjectName = state.subjectName(quiz.subjectId)
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            // Top Row: Stream/Subject Pill + Question Count Badge
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFE0F2FE)
+                                ) {
+                                    Text(
+                                        text = listOfNotNull(stream?.name, subjectName).filter { it.isNotBlank() }.joinToString(" • "),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NenaPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                val qCount = if (quiz.questionCount >= 0) quiz.questionCount else 0
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = Color(0xFFE6F4EA)
+                                ) {
+                                    Text(
+                                        text = "$qCount Question${if (qCount == 1) "" else "s"}",
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF137333)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = quiz.title.ifBlank { "Untitled Quiz" },
+                                fontSize = 17.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF1E293B),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            if (quiz.description.isNotBlank()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = quiz.description,
+                                    fontSize = 13.sp,
+                                    color = Color(0xFF64748B),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+
+                            // Bottom Actions: Add Questions + Delete
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedButton(
+                                    onClick = { builder = BuilderMode.AddTo(quiz) },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Add Questions", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                }
+
+                                IconButton(onClick = { deleting = quiz }) {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = "Delete quiz",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -468,6 +730,65 @@ private fun QuestionCard(
             enabled = enabled,
             modifier = Modifier.fillMaxWidth()
         )
+    }
+}
+
+@Composable
+private fun FilterPill(
+    label: String,
+    count: Int,
+    isSelected: Boolean,
+    accent: Boolean = false,
+    onClick: () -> Unit
+) {
+    val activeBg = if (accent) NenaSecondary else NenaPrimary
+    val bgColor by animateColorAsState(
+        targetValue = if (isSelected) activeBg else Color.White,
+        label = "pillBg"
+    )
+    val textColor by animateColorAsState(
+        targetValue = if (isSelected) Color.White else Color(0xFF475569),
+        label = "pillText"
+    )
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(20.dp),
+        color = bgColor,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) activeBg else Color(0xFFE2E8F0)
+        ),
+        shadowElevation = if (isSelected) 2.dp else 0.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                color = textColor
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Box(
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(
+                        if (isSelected) Color.White.copy(alpha = 0.25f)
+                        else Color(0xFFF1F5F9)
+                    )
+                    .padding(horizontal = 7.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = count.toString(),
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) Color.White else Color(0xFF64748B)
+                )
+            }
+        }
     }
 }
 

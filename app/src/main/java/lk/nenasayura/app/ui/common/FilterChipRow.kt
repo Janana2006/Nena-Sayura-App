@@ -17,7 +17,8 @@ import androidx.compose.ui.unit.dp
 
 /**
  * A labelled, horizontally scrolling row of filter chips with an "All" chip first.
- * [selected] = null means "All".
+ * [selected] = null means "All". Pass [showAll] = false to hide the "All" chip
+ * (then one option should always be selected).
  */
 @Composable
 fun <T> FilterChipRow(
@@ -26,7 +27,8 @@ fun <T> FilterChipRow(
     selected: T?,
     optionLabel: (T) -> String,
     onSelected: (T?) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showAll: Boolean = true
 ) {
     Column(modifier = modifier) {
         Text(
@@ -39,12 +41,14 @@ fun <T> FilterChipRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            item {
-                FilterChip(
-                    selected = selected == null,
-                    onClick = { onSelected(null) },
-                    label = { Text("All") }
-                )
+            if (showAll) {
+                item {
+                    FilterChip(
+                        selected = selected == null,
+                        onClick = { onSelected(null) },
+                        label = { Text("All") }
+                    )
+                }
             }
             items(options) { option ->
                 FilterChip(

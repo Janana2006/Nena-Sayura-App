@@ -82,15 +82,21 @@ fun SetupScreen(
     viewModel: SetupViewModel,
     role: String,
     onDone: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    // --- "Become a teacher / student" mode (account already exists with the other role) ---
+    addRole: Boolean = false,
+    isFree: Boolean = true,
+    fee: Int = 0,
+    bottomButtonLabel: String = "Logout",
+    blockBack: Boolean = true
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val isTeacher = role == "teacher"
 
     // Setup iwara karanakan back eken yanna denna epa
-    BackHandler(enabled = true) { }
+    BackHandler(enabled = blockBack) { }
 
-    LaunchedEffect(role) { viewModel.start(role) }
+    LaunchedEffect(role) { viewModel.start(role, addRole, isFree, fee) }
 
     LaunchedEffect(state.done) {
         if (state.done) {
@@ -479,7 +485,7 @@ fun SetupScreen(
 
                 TextButton(onClick = onLogout) {
                     Text(
-                        text = "Logout",
+                        text = bottomButtonLabel,
                         color = GreyText,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 15.sp

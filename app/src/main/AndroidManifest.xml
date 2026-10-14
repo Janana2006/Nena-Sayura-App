@@ -43,6 +43,13 @@
             android:exported="true"
             android:theme="@style/Theme.NenaSayuraApp"
             android:windowSoftInputMode="adjustResize" />
+
+        <!-- In-app viewer for papers, marking schemes and guide books -->
+        <activity
+            android:name=".ui.common.FileViewerActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:theme="@style/Theme.NenaSayuraApp" />
     </application>
 
 </manifest>

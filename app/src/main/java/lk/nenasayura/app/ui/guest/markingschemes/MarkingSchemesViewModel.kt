@@ -17,6 +17,7 @@ import lk.nenasayura.app.data.repository.MarkingSchemeRepository
 import lk.nenasayura.app.data.repository.SubjectRepository
 import androidx.lifecycle.SavedStateHandle
 import lk.nenasayura.app.data.model.isInCategory
+import lk.nenasayura.app.core.browse.PaperBrowseSelection
 
 /** Everything the Marking Schemes screen needs to draw itself. */
 data class MarkingSchemesUiState(
@@ -31,9 +32,11 @@ data class MarkingSchemesUiState(
     fun subjectName(subjectId: String): String =
         subjects.firstOrNull { it.id == subjectId }?.name ?: ""
 
-    // Only offer filters that actually exist in the data
+    // Only the years that the selected subject has marking schemes for
     val availableYears: List<Int>
-        get() = schemes.map { it.year }.filter { it > 0 }.distinct().sortedDescending()
+        get() = schemes
+            .filter { selectedSubjectId == null || it.subjectId == selectedSubjectId }
+            .map { it.year }.filter { it > 0 }.distinct().sortedDescending()
 
     val availableSubjects: List<Subject>
         get() {
@@ -41,8 +44,9 @@ data class MarkingSchemesUiState(
             return subjects.filter { it.id in usedIds }
         }
 
+    // The subject is always selected (there is no "All" chip), so it does not count as a filter
     val hasActiveFilters: Boolean
-        get() = selectedSubjectId != null || selectedYear != null || query.isNotBlank()
+        get() = selectedYear != null || query.isNotBlank()
 
     val filteredSchemes: List<MarkingScheme>
         get() {
@@ -82,12 +86,29 @@ class MarkingSchemesViewModel(savedStateHandle: SavedStateHandle) : ViewModel() 
                     val subjectsJob = async { subjectRepository.getSubjects() }
                     schemesJob.await() to subjectsJob.await()
                 }
+                // Students pick stream + subjects first. null = no restriction (guests).
+                val browse = PaperBrowseSelection.state.value
+                val allowedIds = if (browse.hasSelection) browse.subjectIds else null
+
+                // Keep only the schemes of the chosen category (and chosen subjects)
+                val categorySchemes = schemes.filter { scheme ->
+                    scheme.isInCategory(category) &&
+                            (allowedIds == null || scheme.subjectId in allowedIds)
+                }
+                val visibleSubjects = if (allowedIds == null) subjects
+                else subjects.filter { s -> s.id in allowedIds }
+
+                // One subject is always selected: keep the current one, otherwise the first one with schemes
+                val usedIds = categorySchemes.map { scheme -> scheme.subjectId }.toSet()
+                val firstSubjectId = visibleSubjects.firstOrNull { s -> s.id in usedIds }?.id
+
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        // Keep only the schemes of the chosen category
-                        schemes = schemes.filter { scheme -> scheme.isInCategory(category) },
-                        subjects = subjects
+                        schemes = categorySchemes,
+                        subjects = visibleSubjects,
+                        selectedSubjectId = it.selectedSubjectId
+                            ?.takeIf { id -> id in usedIds } ?: firstSubjectId
                     )
                 }
             } catch (e: CancellationException) {
@@ -104,10 +125,13 @@ class MarkingSchemesViewModel(savedStateHandle: SavedStateHandle) : ViewModel() 
     }
 
     fun onQueryChange(value: String) = _uiState.update { it.copy(query = value) }
-    fun onSubjectSelected(subjectId: String?) = _uiState.update { it.copy(selectedSubjectId = subjectId) }
+    // Changing the subject also clears the year, because the years differ for each subject
+    fun onSubjectSelected(subjectId: String?) =
+        _uiState.update { it.copy(selectedSubjectId = subjectId, selectedYear = null) }
     fun onYearSelected(year: Int?) = _uiState.update { it.copy(selectedYear = year) }
 
+    // Clears year and search. The selected subject stays.
     fun clearFilters() = _uiState.update {
-        it.copy(selectedSubjectId = null, selectedYear = null, query = "")
+        it.copy(selectedYear = null, query = "")
     }
 }

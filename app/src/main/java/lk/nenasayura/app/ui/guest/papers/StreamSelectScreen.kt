@@ -40,13 +40,14 @@ private val streamPalettes = listOf(
 fun StreamSelectScreen(
     onBack: () -> Unit,
     onStreamSelected: (streamId: String) -> Unit,
+    title: String = "Papers",
     viewModel: StreamSelectViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val errorMessage = state.errorMessage
 
     Scaffold(
-        topBar = { NenaTopBar(title = "Papers", onBack = onBack) },
+        topBar = { NenaTopBar(title = title, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Box(

@@ -52,6 +52,7 @@ private enum class TeacherTab(val label: String, val title: String, val icon: Im
 @Composable
 fun TeacherHomeScreen(
     onSignOut: () -> Unit,
+    onRoleChanged: (String) -> Unit = {},
     viewModel: TeacherViewModel = viewModel()
 ) {
     val firebaseUser = remember { FirebaseAuth.getInstance().currentUser }
@@ -156,6 +157,7 @@ fun TeacherHomeScreen(
                     onLoadSubjects = viewModel::loadStreamSubjects,
                     onSave = viewModel::saveProfile,
                     onSignOut = onSignOut,
+                    onRoleChanged = onRoleChanged,
                     modifier = Modifier.padding(innerPadding)
                 )
             }
