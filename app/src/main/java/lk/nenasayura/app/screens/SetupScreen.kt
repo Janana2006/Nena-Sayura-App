@@ -686,3 +686,5 @@ private fun SubjectRow(
         }
     }
 }
+
+annotation class SetupScreen
