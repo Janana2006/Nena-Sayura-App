@@ -38,6 +38,8 @@ import lk.nenasayura.app.ui.common.NenaTopBar
 fun SubjectSelectScreen(
     onBack: () -> Unit,
     onDone: () -> Unit,
+    title: String = "Papers",
+    hint: String = "Papers will be shown for these subjects only",
     viewModel: SubjectSelectViewModel = viewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -45,7 +47,7 @@ fun SubjectSelectScreen(
     val stream = state.stream
 
     Scaffold(
-        topBar = { NenaTopBar(title = stream?.name ?: "Papers", onBack = onBack) },
+        topBar = { NenaTopBar(title = stream?.name ?: title, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background,
         bottomBar = {
             if (stream != null && stream.subjects.isNotEmpty()) {
@@ -98,7 +100,7 @@ fun SubjectSelectScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Papers will be shown for these subjects only",
+                                    text = hint,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

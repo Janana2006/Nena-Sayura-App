@@ -4,15 +4,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.runtime.Composable
+import lk.nenasayura.app.core.browse.GuideBrowseState
 import lk.nenasayura.app.ui.common.CategoryItem
 import lk.nenasayura.app.ui.common.CategoryScreen
+import lk.nenasayura.app.ui.common.StreamSummaryCard
 import lk.nenasayura.app.ui.theme.NenaIconColors
 
 /** Guide Books landing page. [onOpenCategory] gets "guide" or "resource". */
 @Composable
 fun GuideBookCategoriesScreen(
     onBack: () -> Unit,
-    onOpenCategory: (category: String) -> Unit
+    onOpenCategory: (category: String) -> Unit,
+    // Students: their stream + subjects (shown on top with a "Change" button).
+    selection: GuideBrowseState? = null,
+    onChangeSelection: (() -> Unit)? = null
 ) {
     CategoryScreen(
         title = "Guide Books",
@@ -33,6 +38,15 @@ fun GuideBookCategoriesScreen(
                 onClick = { onOpenCategory("resource") }
             )
         ),
-        onBack = onBack
+        onBack = onBack,
+        header = if (selection != null && selection.hasSelection && onChangeSelection != null) {
+            {
+                StreamSummaryCard(
+                    streamName = selection.streamName,
+                    details = selection.subjects.joinToString(", ") { it.name },
+                    onChange = onChangeSelection
+                )
+            }
+        } else null
     )
 }

@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import java.util.Locale
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherProfile
+import lk.nenasayura.app.ui.common.RoleSwitchCard
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
@@ -65,7 +66,8 @@ fun TeacherProfileTab(
     onLoadSubjects: () -> Unit,
     onSave: (TeacherProfile, () -> Unit) -> Unit,
     onSignOut: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onRoleChanged: (String) -> Unit = {}
 ) {
     var editing by remember { mutableStateOf(false) }
 
@@ -127,6 +129,9 @@ fun TeacherProfileTab(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Edit profile")
             }
+            Spacer(modifier = Modifier.height(16.dp))
+            // Student dashboard (switch, or use as a student too)
+            RoleSwitchCard(currentRole = "teacher", onRoleChanged = onRoleChanged)
             Spacer(modifier = Modifier.height(10.dp))
             OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
                 Icon(
@@ -330,5 +335,4 @@ private fun InfoCard(label: String, value: String) {
         }
     }
 }
-
 private fun money(value: Int): String = String.format(Locale.US, "%,d", value)

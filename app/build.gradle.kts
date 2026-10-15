@@ -12,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId = "lk.nenasayura.app"
-        minSdk = 31
-        targetSdk = 37
+        minSdk = 26
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
 
@@ -73,4 +73,7 @@ dependencies {
 
     // Icons
     implementation(libs.androidx.material.icons.extended)
+
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
 }

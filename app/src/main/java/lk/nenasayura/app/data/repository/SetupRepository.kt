@@ -81,6 +81,7 @@ class SetupRepository(
     }
 
     // teacher saha student dekatama (role anuwa) stream/subjects save karala setupDone = true
+    // Account ekata passe add karapu role ekak (studentStudy / teacherStudy) nam, e map ekata witharak liyanawa
     fun saveSetup(
         role: String,
         stream: StudyStream,
@@ -93,22 +94,34 @@ class SetupRepository(
             return
         }
 
-        val data = hashMapOf<String, Any>(
-            "uid" to user.uid,
-            "role" to role,
-            "streamId" to stream.id,
-            "streamName" to stream.name,
-            "subjectIds" to subjects.map { it.id },
-            "subjectNames" to subjects.map { it.name },
-            "setupDone" to true
-        )
-        user.email?.let { data["email"] = it }
-        user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
+        val ref = db.collection("users").document(user.uid)
+        ref.get()
+            .addOnSuccessListener { doc ->
+                val ownMapKey = "${role}Study"
+                val study = hashMapOf(
+                    "streamId" to stream.id,
+                    "streamName" to stream.name,
+                    "subjectIds" to subjects.map { it.id },
+                    "subjectNames" to subjects.map { it.name }
+                )
 
-        db.collection("users").document(user.uid).set(data, SetOptions.merge())
-            .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(Unit))
-                else onResult(Result.failure(task.exception ?: Exception("Failed to save")))
+                val data = hashMapOf<String, Any>("uid" to user.uid, "setupDone" to true)
+                if (doc.get(ownMapKey) is Map<*, *>) {
+                    // This role was added later: keep the other role's top-level details untouched
+                    data[ownMapKey] = study
+                } else {
+                    data["role"] = role
+                    data.putAll(study)
+                }
+                user.email?.let { data["email"] = it }
+                user.displayName?.takeIf { it.isNotBlank() }?.let { data["name"] = it }
+
+                ref.set(data, SetOptions.merge())
+                    .addOnCompleteListener { task ->
+                        if (task.isSuccessful) onResult(Result.success(Unit))
+                        else onResult(Result.failure(task.exception ?: Exception("Failed to save")))
+                    }
             }
+            .addOnFailureListener { onResult(Result.failure(it)) }
     }
 }

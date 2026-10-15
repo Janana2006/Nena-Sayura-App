@@ -28,7 +28,9 @@ class PaperRepository(
             subjectId = getString("subjectId") ?: "",
             year = readYear(get("year")),
             type = getString("type") ?: "",
-            fileUrl = fileUrl
+            fileUrl = fileUrl,
+            term = (get("term") as? Number)?.toInt() ?: 0,
+            province = getString("province") ?: ""
         )
     }
 

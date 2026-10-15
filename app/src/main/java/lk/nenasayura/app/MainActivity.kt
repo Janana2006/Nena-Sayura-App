@@ -28,6 +28,8 @@ import lk.nenasayura.app.screens.RegisterScreen
 import lk.nenasayura.app.screens.ResetPasswordScreen
 import lk.nenasayura.app.screens.RoleSelectScreen
 import lk.nenasayura.app.screens.SetupScreen
+import lk.nenasayura.app.ui.admin.AdminHomeScreen
+import lk.nenasayura.app.ui.common.applyActiveRole
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 import lk.nenasayura.app.viewmodel.AuthViewModel
@@ -212,6 +214,23 @@ class MainActivity : ComponentActivity() {
 
                         // Teacher: real Teacher Home (ui/teacher)
                         "TeacherHome" -> TeacherHomeScreen(
+                            // Teacher -> Student dashboard: student home lives in GuestHomeActivity
+                            onRoleChanged = { role ->
+                                applyActiveRole(role)
+                                if (role == "student") {
+                                    startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
+                                    finish()
+                                }
+                            },
+                            onSignOut = {
+                                AppSession.provider.signOut()
+                                authViewModel.logout()
+                                selectScreen = "Login"
+                            }
+                        )
+
+                        // Admin: Admin Dashboard (ui/admin)
+                        "AdminHome" -> AdminHomeScreen(
                             onSignOut = {
                                 AppSession.provider.signOut()
                                 authViewModel.logout()

@@ -2,6 +2,7 @@ package lk.nenasayura.app.util
 
 
 
+import android.app.Activity
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
@@ -9,18 +10,36 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
+import lk.nenasayura.app.ui.common.FileViewerActivity
 
 /** Opens or downloads a document (paper, marking scheme, guide book...) from its URL. */
 object FileActions {
 
-    /** Opens the file in a PDF app or the browser. */
-    fun openFile(context: Context, url: String) {
+    /**
+     * Opens the file inside the app (PDF pages / image viewer).
+     * [title] is shown in the top bar of the viewer.
+     */
+    fun openFile(context: Context, url: String, title: String = "") {
+        if (url.isBlank()) {
+            toast(context, "The file link is missing.")
+            return
+        }
+        val intent = FileViewerActivity.intent(context, url, title)
+        // Only needed when the context is not an Activity
+        if (context !is Activity) intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
+    /** Opens the file in another app (PDF app or the browser). Used for file types the viewer can't show. */
+    fun openExternally(context: Context, url: String) {
         if (url.isBlank()) {
             toast(context, "The file link is missing.")
             return
         }
         try {
-            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
         } catch (e: ActivityNotFoundException) {
             toast(context, "No app found to open this file.")
         }

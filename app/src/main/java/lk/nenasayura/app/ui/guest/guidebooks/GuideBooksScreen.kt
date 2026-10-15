@@ -1,7 +1,5 @@
 package lk.nenasayura.app.ui.guest.guidebooks
 
-
-
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import lk.nenasayura.app.data.model.guideBookCategoryTitle
 import lk.nenasayura.app.ui.common.DocumentCard
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.ErrorView
@@ -34,9 +33,8 @@ import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.util.FileActions
-import lk.nenasayura.app.data.model.guideBookCategoryTitle
 
-/** Lists guide books with a subject filter. Works for guests and logged-in students. */
+/** Lists guide books. Guests get a subject filter, students open it for one chosen subject. */
 @Composable
 fun GuideBooksScreen(
     onBack: () -> Unit,
@@ -49,8 +47,14 @@ fun GuideBooksScreen(
     val categoryTitle = guideBookCategoryTitle(viewModel.category)
     val badgeText = if (viewModel.category == "resource") "Resource Book" else "Guide Book"
 
+    // Students: the subject they picked (stream -> category -> subject)
+    val fixedSubjectName = state.fixedSubjectId
+        ?.let { state.subjectName(it) }
+        ?.ifBlank { null }
+    val screenTitle = if (fixedSubjectName != null) "$fixedSubjectName • $categoryTitle" else categoryTitle
+
     Scaffold(
-        topBar = { NenaTopBar(title = categoryTitle, onBack = onBack) },
+        topBar = { NenaTopBar(title = screenTitle, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         Column(
@@ -67,7 +71,11 @@ fun GuideBooksScreen(
                 )
 
                 state.books.isEmpty() -> EmptyView(
-                    message = "No ${categoryTitle.lowercase()} are available yet."
+                    message = if (state.fixedSubjectId != null) {
+                        "No ${categoryTitle.lowercase()} are available for this subject yet."
+                    } else {
+                        "No ${categoryTitle.lowercase()} are available yet."
+                    }
                 )
 
                 else -> {
@@ -90,7 +98,8 @@ fun GuideBooksScreen(
                         shape = RoundedCornerShape(14.dp)
                     )
 
-                    if (state.availableSubjects.isNotEmpty()) {
+                    // The subject filter is only for guests; a student already chose the subject
+                    if (state.fixedSubjectId == null && state.availableSubjects.isNotEmpty()) {
                         FilterChipRow(
                             label = "Subject",
                             options = state.availableSubjects,
@@ -103,7 +112,7 @@ fun GuideBooksScreen(
 
                     if (visibleBooks.isEmpty()) {
                         EmptyView(
-                            message = "No guide books match your filters.",
+                            message = "No ${categoryTitle.lowercase()} match your filters.",
                             actionLabel = if (state.hasActiveFilters) "Clear filters" else null,
                             onAction = if (state.hasActiveFilters) viewModel::clearFilters else null
                         )
@@ -114,7 +123,7 @@ fun GuideBooksScreen(
                         ) {
                             item {
                                 Text(
-                                    text = "${visibleBooks.size} guide books",
+                                    text = "${visibleBooks.size} ${categoryTitle.lowercase()}",
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
