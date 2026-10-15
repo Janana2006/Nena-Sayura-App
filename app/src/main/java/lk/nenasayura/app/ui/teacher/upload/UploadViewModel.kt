@@ -24,6 +24,8 @@ data class UploadUiState(
     val access: AccessType = AccessType.FREE,
     val fileUri: Uri? = null,
     val fileName: String = "",
+    val answerFileUri: Uri? = null,
+    val answerFileName: String = "",
     val videoUrl: String = "",
     val isUploading: Boolean = false,
     val errorMessage: String? = null,
@@ -60,6 +62,16 @@ class UploadViewModel(
         }
         edit { it.copy(fileUri = uri, fileName = name) }
     }
+
+    fun onAnswerFilePicked(uri: Uri, name: String, sizeBytes: Long) {
+        if (sizeBytes > MAX_FILE_BYTES) {
+            _state.update { it.copy(errorMessage = "Answer file is too large. Maximum size is 50 MB.") }
+            return
+        }
+        edit { it.copy(answerFileUri = uri, answerFileName = name) }
+    }
+
+    fun clearAnswerFile() = edit { it.copy(answerFileUri = null, answerFileName = "") }
 
     fun clearUploaded() = _state.update { it.copy(uploadedOk = false) }
 
@@ -106,7 +118,9 @@ class UploadViewModel(
                     access = access,
                     fileUri = s.fileUri,
                     fileName = s.fileName,
-                    videoUrl = s.videoUrl
+                    videoUrl = s.videoUrl,
+                    answerFileUri = s.answerFileUri,
+                    answerFileName = s.answerFileName
                 )
                 // Clear the form but keep type / subject / access for the next upload.
                 _state.update {
@@ -115,6 +129,8 @@ class UploadViewModel(
                         description = "",
                         fileUri = null,
                         fileName = "",
+                        answerFileUri = null,
+                        answerFileName = "",
                         videoUrl = "",
                         isUploading = false,
                         uploadedOk = true

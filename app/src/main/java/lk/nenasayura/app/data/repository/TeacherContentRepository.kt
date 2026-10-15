@@ -42,19 +42,35 @@ class TeacherContentRepository(
         access: AccessType,
         fileUri: Uri?,
         fileName: String,
-        videoUrl: String
+        videoUrl: String,
+        answerFileUri: Uri? = null,
+        answerFileName: String = ""
     ) {
         var fileUrl = ""
+        var answerFileUrl = ""
+        val context = FirebaseApp.getInstance().applicationContext
 
         // 1) Files (not video links) go to Cloudinary first.
         if (type != ContentType.VIDEO_LINK && fileUri != null) {
-            val context = FirebaseApp.getInstance().applicationContext
             val safeName = fileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
             fileUrl = CloudinaryUploader
                 .uploadFile(
                     context,
                     fileUri,
                     "${System.currentTimeMillis()}_$safeName",
+                    "nena_sayura/teacher_content/$teacherId"
+                )
+                .getOrThrow()
+        }
+
+        // 1.1) Upload Answer Sheet if provided (for Model Paper or others)
+        if (answerFileUri != null) {
+            val safeAnsName = answerFileName.replace(Regex("[^A-Za-z0-9._-]"), "_")
+            answerFileUrl = CloudinaryUploader
+                .uploadFile(
+                    context,
+                    answerFileUri,
+                    "${System.currentTimeMillis()}_ans_$safeAnsName",
                     "nena_sayura/teacher_content/$teacherId"
                 )
                 .getOrThrow()
@@ -73,6 +89,9 @@ class TeacherContentRepository(
             "fileUrl" to fileUrl,
             "fileName" to fileName,
             "storagePath" to "",
+            "answerFileUrl" to answerFileUrl,
+            "answerFileName" to answerFileName,
+            "answerStoragePath" to "",
             "videoUrl" to videoUrl.trim(),
             "createdAt" to FieldValue.serverTimestamp()
         )
@@ -112,6 +131,9 @@ class TeacherContentRepository(
         fileUrl = getString("fileUrl") ?: "",
         fileName = getString("fileName") ?: "",
         storagePath = getString("storagePath") ?: "",
+        answerFileUrl = getString("answerFileUrl") ?: "",
+        answerFileName = getString("answerFileName") ?: "",
+        answerStoragePath = getString("answerStoragePath") ?: "",
         videoUrl = getString("videoUrl") ?: "",
         createdAtMillis = getTimestamp("createdAt")?.toDate()?.time ?: 0L
     )

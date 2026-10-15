@@ -39,6 +39,9 @@ data class TeacherContent(
     val fileUrl: String = "",
     val fileName: String = "",
     val storagePath: String = "",
+    val answerFileUrl: String = "",
+    val answerFileName: String = "",
+    val answerStoragePath: String = "",
     val videoUrl: String = "",
     val createdAtMillis: Long = 0L
 ) {

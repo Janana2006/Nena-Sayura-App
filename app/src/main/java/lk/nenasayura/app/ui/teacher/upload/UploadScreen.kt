@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -35,6 +36,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -100,6 +102,15 @@ fun UploadScreen(
         if (uri != null) {
             val (name, size) = context.queryFileInfo(uri)
             viewModel.onFilePicked(uri, name, size)
+        }
+    }
+
+    val answerFilePicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            val (name, size) = context.queryFileInfo(uri)
+            viewModel.onAnswerFilePicked(uri, name, size)
         }
     }
 
@@ -198,6 +209,38 @@ fun UploadScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            if (state.type == ContentType.MODEL_PAPER) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Label("Answer Sheet (optional)")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = { answerFilePicker.launch(FILE_TYPES) },
+                        enabled = !state.isUploading,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.AttachFile, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = state.answerFileName.ifBlank { "Choose answer sheet (PDF, image, Word, PowerPoint)" },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (state.answerFileUri != null && !state.isUploading) {
+                        IconButton(onClick = { viewModel.clearAnswerFile() }) {
+                            Icon(
+                                Icons.Filled.Clear,
+                                contentDescription = "Remove answer sheet",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
             }
         }
 
