@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.repository.RoleRepository
 import lk.nenasayura.app.data.repository.SetupRepository
+import lk.nenasayura.app.data.repository.StreamSeeder
 
 data class SetupUiState(
     val role: String = "student",
@@ -32,9 +33,9 @@ data class SetupUiState(
     val hasGroups: Boolean
         get() = role != "teacher" && selectedStream?.groups?.isNotEmpty() == true
 
-    // Teacher: subject 1k, Student: subjects 3k
+    // Teacher: kamathi subject ganak, Student: subjects 3k
     val maxSubjects: Int
-        get() = if (role == "teacher") 1 else 3
+        get() = if (role == "teacher") Int.MAX_VALUE else 3
 
     // Slots nathi stream walata: subjects 3t wada kamai nam thiyena okkoma select karanna oni
     val requiredCount: Int
@@ -47,7 +48,9 @@ data class SetupUiState(
     val canConfirm: Boolean
         get() {
             val stream = selectedStream ?: return false
-            return if (hasGroups) {
+            return if (role == "teacher") {
+                selectedSubjectIds.isNotEmpty()
+            } else if (hasGroups) {
                 // hama slot ekakama select karala thiyenna oni
                 stream.groups.all { group -> group.any { it.id in selectedSubjectIds } }
             } else {
@@ -72,15 +75,55 @@ class SetupViewModel(
 
     fun loadStreams() {
         _state.update { it.copy(loading = true, error = null) }
-        repo.getStreams { result ->
-            result.fold(
-                onSuccess = { list -> _state.update { it.copy(loading = false, streams = list) } },
-                onFailure = { e ->
-                    _state.update {
-                        it.copy(loading = false, error = e.localizedMessage ?: "Failed to load streams")
-                    }
+        viewModelScope.launch {
+            if (StreamSeeder.ENABLED) {
+                try {
+                    StreamSeeder.seedMissing()
+                } catch (e: Exception) {
+                    // Ignore seeding errors
                 }
-            )
+            }
+            repo.getStreams { result ->
+                result.fold(
+                    onSuccess = { list ->
+                        val fallbackMap = StreamSeeder.getFallbackStreams().associateBy { it.id }
+                        val firestoreMap = list.associateBy { it.id }
+                        val combinedKeys = (fallbackMap.keys + firestoreMap.keys)
+                        val combined = combinedKeys.mapNotNull { id ->
+                            val fs = firestoreMap[id]
+                            val fb = fallbackMap[id]
+                            if (fs != null && fs.subjects.isNotEmpty()) {
+                                fs.copy(
+                                    name = if (fs.name != fs.id && fs.name.isNotBlank()) fs.name else (fb?.name ?: fs.name),
+                                    groups = if (fs.groups.isNotEmpty()) fs.groups else (fb?.groups ?: emptyList())
+                                )
+                            } else {
+                                fb ?: fs
+                            }
+                        }.sortedBy { stream ->
+                            when (stream.id.lowercase()) {
+                                "maths" -> 1
+                                "bio", "biology" -> 2
+                                "commerce" -> 3
+                                "technology" -> 4
+                                "arts" -> 5
+                                else -> 99
+                            }
+                        }
+                        _state.update { it.copy(loading = false, streams = combined) }
+                    },
+                    onFailure = { e ->
+                        val fallback = StreamSeeder.getFallbackStreams()
+                        if (fallback.isNotEmpty()) {
+                            _state.update { it.copy(loading = false, streams = fallback) }
+                        } else {
+                            _state.update {
+                                it.copy(loading = false, error = e.localizedMessage ?: "Failed to load streams")
+                            }
+                        }
+                    }
+                )
+            }
         }
     }
 
@@ -106,8 +149,8 @@ class SetupViewModel(
         _state.update { s ->
             val current = s.selectedSubjectIds
             val next = when {
-                // Teacher: ekak, aluth ekak select kalama replace wenawa
-                s.maxSubjects == 1 -> setOf(id)
+                // Teacher: kamathi subject ganak select / unselect karanna puluwan
+                s.role == "teacher" -> if (id in current) current - id else current + id
 
                 // Student + slots
                 s.hasGroups -> {

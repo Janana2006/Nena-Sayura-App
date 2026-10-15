@@ -73,13 +73,17 @@ class UploadViewModel(
         if (s.isUploading) return
 
         val subject = s.selectedSubject
+        val hasDescription = s.description.isNotBlank()
+        val hasFile = s.type != ContentType.VIDEO_LINK && s.fileUri != null
+        val hasVideo = s.type == ContentType.VIDEO_LINK && s.videoUrl.isNotBlank()
+
         val error = when {
             s.title.isBlank() -> "Please enter a title."
             subject == null -> "Please select a subject."
-            s.type == ContentType.VIDEO_LINK && !isValidLink(s.videoUrl) ->
+            s.type == ContentType.VIDEO_LINK && hasVideo && !isValidLink(s.videoUrl) ->
                 "Please enter a valid video link (starting with https://)."
-            s.type != ContentType.VIDEO_LINK && s.fileUri == null ->
-                "Please choose a file to upload."
+            !hasDescription && !hasFile && !hasVideo ->
+                "Please provide a description, a file, or a video link."
             else -> null
         }
         if (error != null || subject == null) {

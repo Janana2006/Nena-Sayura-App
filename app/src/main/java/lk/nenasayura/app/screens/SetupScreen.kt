@@ -187,7 +187,7 @@ fun SetupScreen(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isTeacher) "Pick your stream and your subject"
+                                text = if (isTeacher) "Pick your stream and subjects"
                                 else "Pick your A/L stream and 3 subjects",
                                 fontSize = 13.sp,
                                 color = Color.White.copy(alpha = 0.9f)
@@ -393,7 +393,7 @@ fun SetupScreen(
                             } else {
                                 // ===== Slots nathi streams =====
                                 SectionTitle(
-                                    title = if (isTeacher) "Select one subject" else "Select $need subjects",
+                                    title = if (isTeacher) "Select subjects" else "Select $need subjects",
                                     subtitle = "in ${selectedStream.name}"
                                 )
                                 if (limitReached) {

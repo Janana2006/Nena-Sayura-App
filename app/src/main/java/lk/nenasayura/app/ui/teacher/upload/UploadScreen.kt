@@ -164,7 +164,7 @@ fun UploadScreen(
         OutlinedTextField(
             value = state.description,
             onValueChange = viewModel::onDescriptionChange,
-            label = { Text("Description (optional)") },
+            label = { Text("Description") },
             minLines = 3,
             enabled = !state.isUploading,
             modifier = Modifier.fillMaxWidth()
