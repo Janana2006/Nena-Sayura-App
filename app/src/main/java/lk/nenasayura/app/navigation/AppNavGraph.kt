@@ -48,6 +48,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
+import lk.nenasayura.app.ui.student.timetable.PlannerSetupScreen
+import lk.nenasayura.app.ui.student.timetable.TimetableScreen
 
 /**
  * Root navigation graph of the app. The app always starts on Guest Home.
@@ -403,7 +405,19 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         }
         // Student-only screens: each is replaced by a real screen in its own task
         placeholder(Routes.TEACHERS, "Teachers", navController)
-        placeholder(Routes.TIMETABLE, "Timetable", navController)
+        composable(Routes.TIMETABLE) {
+            TimetableScreen(
+                onBack = { navController.popBackStack() },
+                onSetup = { navController.navigate(Routes.TIMETABLE_SETUP) }
+            )
+        }
+        composable(Routes.TIMETABLE_SETUP) {
+            PlannerSetupScreen(
+                onBack = { navController.popBackStack() },
+                onChooseSubjects = { navController.navigate(Routes.STUDY_EDIT) },
+                onFinished = { navController.popBackStack() }
+            )
+        }
         placeholder(Routes.REMINDERS, "Reminders", navController)
         placeholder(Routes.ANALYTICS, "Study Analytics", navController)
     }

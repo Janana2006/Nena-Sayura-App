@@ -37,6 +37,7 @@ object Routes {
     // Student-only screens (reached from Student Home)
     const val TEACHERS = "teachers"
     const val TIMETABLE = "timetable"
+    const val TIMETABLE_SETUP = "timetable_setup"
     const val REMINDERS = "reminders"
     const val ANALYTICS = "analytics"
     const val QUICK_ACCESS = "quick_access"
