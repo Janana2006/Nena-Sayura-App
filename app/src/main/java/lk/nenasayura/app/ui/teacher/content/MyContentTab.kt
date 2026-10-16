@@ -57,6 +57,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.ui.common.EmptyView
@@ -81,10 +82,14 @@ fun MyContentTab(
 ) {
     val context = LocalContext.current
     var typeFilter by remember { mutableStateOf<ContentType?>(null) }
+    var statusFilter by remember { mutableStateOf<ContentStatus?>(null) }
     var editing by remember { mutableStateOf<TeacherContent?>(null) }
     var deleting by remember { mutableStateOf<TeacherContent?>(null) }
 
-    val shown = contents.filter { typeFilter == null || it.type == typeFilter }
+    val shown = contents.filter {
+        (typeFilter == null || it.type == typeFilter) &&
+                (statusFilter == null || it.status == statusFilter)
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         Spacer(modifier = Modifier.height(8.dp))
@@ -94,6 +99,14 @@ fun MyContentTab(
             selected = typeFilter,
             optionLabel = { it.label },
             onSelected = { typeFilter = it }
+        )
+        // History: Pending / Approved / Declined, with how many items are in each
+        FilterChipRow(
+            label = "Status",
+            options = ContentStatus.entries.toList(),
+            selected = statusFilter,
+            optionLabel = { s -> "${s.label} (${contents.count { it.status == s }})" },
+            onSelected = { statusFilter = it }
         )
 
         Row(
@@ -230,6 +243,58 @@ private fun ContentCard(
                 } else {
                     Badge(text = "Free", background = NenaSecondaryContainer, textColor = Color(0xFF004D40))
                 }
+                StatusBadge(content.status)
+            }
+
+            // Review result: waiting / approved / declined (with the admin's message)
+            Spacer(modifier = Modifier.height(8.dp))
+            when (content.status) {
+                ContentStatus.PENDING -> Text(
+                    text = "Waiting for admin approval. Students can't see this yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF6B4A00)
+                )
+
+                ContentStatus.APPROVED -> Text(
+                    text = if (content.reviewedAtMillis > 0L) {
+                        "Approved on ${formatDate(content.reviewedAtMillis)}. Students can see this."
+                    } else {
+                        "Approved. Students can see this."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF004D40)
+                )
+
+                ContentStatus.DECLINED -> Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFDAD6),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (content.reviewedAtMillis > 0L) {
+                                "Declined on ${formatDate(content.reviewedAtMillis)}"
+                            } else {
+                                "Declined by admin"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF93000A)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = content.declineReason.ifBlank { "No reason was given." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF410002)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Edit the item to fix it and it will be sent for review again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF410002)
+                        )
+                    }
+                }
             }
 
             if (content.description.isNotBlank()) {
@@ -283,6 +348,15 @@ private fun ContentCard(
 }
 
 @Composable
+private fun StatusBadge(status: ContentStatus) {
+    when (status) {
+        ContentStatus.PENDING -> Badge("Pending", NenaAccentContainer, Color(0xFF6B4A00))
+        ContentStatus.APPROVED -> Badge("Approved", NenaSecondaryContainer, Color(0xFF004D40))
+        ContentStatus.DECLINED -> Badge("Declined", Color(0xFFFFDAD6), Color(0xFF93000A))
+    }
+}
+
+@Composable
 private fun Badge(text: String, background: Color, textColor: Color) {
     Surface(shape = RoundedCornerShape(8.dp), color = background) {
         Text(
@@ -323,6 +397,11 @@ private fun EditDialog(
                     label = { Text("Description") },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "After you save, this item is sent to the admin for review again.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (canChooseAccess) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

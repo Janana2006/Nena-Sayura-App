@@ -46,6 +46,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.Payment
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.model.TeacherProfile
@@ -90,6 +91,24 @@ fun TeacherDashboardScreen(
                 StatCard(
                     "Free items",
                     contents.count { it.access == AccessType.FREE }.toString(),
+                    Modifier.weight(1f)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatCard(
+                    "Pending",
+                    contents.count { it.status == ContentStatus.PENDING }.toString(),
+                    Modifier.weight(1f)
+                )
+                StatCard(
+                    "Approved",
+                    contents.count { it.status == ContentStatus.APPROVED }.toString(),
+                    Modifier.weight(1f)
+                )
+                StatCard(
+                    "Declined",
+                    contents.count { it.status == ContentStatus.DECLINED }.toString(),
                     Modifier.weight(1f)
                 )
             }

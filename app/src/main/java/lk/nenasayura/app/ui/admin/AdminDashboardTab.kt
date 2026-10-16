@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.data.model.AdminPermission
+import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
@@ -121,6 +123,44 @@ fun AdminDashboardTab(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     rowItems.forEach { (label, value) -> StatCard(label, value, Modifier.weight(1f)) }
                     repeat(3 - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+
+            // ---- Teacher uploads waiting for approval ----
+            if (state.can(AdminPermission.TEACHER_UPLOADS) && state.pendingCount > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    onClick = onOpenContent,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = NenaAccentContainer),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.PendingActions,
+                            contentDescription = null,
+                            tint = Color(0xFF6B4A00),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                            Text(
+                                text = "${state.pendingCount} teacher upload" +
+                                        (if (state.pendingCount == 1) "" else "s") + " waiting for review",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF3B2A00)
+                            )
+                            Text(
+                                text = "Tap to approve or decline",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6B4A00)
+                            )
+                        }
+                    }
                 }
             }
 

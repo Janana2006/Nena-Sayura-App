@@ -3,6 +3,7 @@ package lk.nenasayura.app.ui.admin
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -11,13 +12,16 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.data.model.AppUser
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Payment
 import lk.nenasayura.app.data.model.StaffRole
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
+import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.repository.AdminRepository
+import lk.nenasayura.app.data.repository.TeacherContentRepository
 
 /** What one teacher earned: students who paid, total paid, admin's cut and the rest. */
 data class TeacherSummary(
@@ -42,6 +46,8 @@ data class AdminUiState(
     val papers: List<Paper> = emptyList(),
     val guideBooks: List<GuideBook> = emptyList(),
     val streams: List<StudyStream> = emptyList(),
+    /** Every teacher upload (pending, approved and declined) for the review screen. */
+    val teacherContents: List<TeacherContent> = emptyList(),
     /** True while something is being saved / uploaded. */
     val busy: Boolean = false,
     /** One-time message shown in a snackbar. */
@@ -49,6 +55,9 @@ data class AdminUiState(
 ) {
     fun can(permission: AdminPermission): Boolean = permission in access
     val canSeeContent: Boolean get() = access.any { it in AdminPermission.CONTENT }
+
+    /** Teacher uploads still waiting for this admin's decision. */
+    val pendingCount: Int get() = teacherContents.count { it.status == ContentStatus.PENDING }
 
     val students: List<AppUser> get() = users.filter { it.isStudent }
     val teachers: List<AppUser> get() = users.filter { it.isTeacher }
@@ -81,7 +90,8 @@ data class AdminUiState(
 }
 
 class AdminViewModel(
-    private val repo: AdminRepository = AdminRepository()
+    private val repo: AdminRepository = AdminRepository(),
+    private val contentRepo: TeacherContentRepository = TeacherContentRepository()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AdminUiState())
@@ -127,6 +137,9 @@ class AdminViewModel(
         val papers = safe("papers", emptyList<Paper>()) { repo.getPapers() }
         val books = safe("guide books", emptyList<GuideBook>()) { repo.getGuideBooks() }
         val streams = safe("streams", emptyList<StudyStream>()) { repo.getStreams() }
+        val teacherContents = safe("teacher uploads", emptyList<TeacherContent>()) {
+            if (_state.value.can(AdminPermission.TEACHER_UPLOADS)) contentRepo.getAllForReview() else emptyList()
+        }
 
         _state.update {
             it.copy(
@@ -137,6 +150,7 @@ class AdminViewModel(
                 papers = papers,
                 guideBooks = books,
                 streams = streams,
+                teacherContents = teacherContents,
                 message = if (loadErrors.isEmpty()) it.message
                 else "Could not load: ${loadErrors.joinToString()}. Check the Firestore rules."
             )
@@ -334,6 +348,55 @@ class AdminViewModel(
         act("Commission updated", onResult) {
             repo.setCommissionPercent(percent)
             _state.update { it.copy(commissionPercent = percent) }
+        }
+    }
+
+    // ---------------- teacher uploads (approve / decline) ----------------
+
+    /** Makes the upload visible to students and clears any old decline message. */
+    fun approveContent(content: TeacherContent) {
+        val adminUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        act("Approved \"${content.title}\"", this::toast) {
+            contentRepo.approve(content.id, adminUid)
+            _state.update { s ->
+                s.copy(
+                    teacherContents = s.teacherContents.map {
+                        if (it.id == content.id) {
+                            it.copy(
+                                status = ContentStatus.APPROVED,
+                                declineReason = "",
+                                reviewedAtMillis = System.currentTimeMillis()
+                            )
+                        } else it
+                    }
+                )
+            }
+        }
+    }
+
+    /** Declines the upload. The reason is saved so the teacher can read it. */
+    fun declineContent(content: TeacherContent, reason: String, onResult: (String?) -> Unit) {
+        val text = reason.trim()
+        if (text.length < 5) {
+            onResult("Please write a short reason so the teacher knows what to fix.")
+            return
+        }
+        val adminUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
+        act("Declined \"${content.title}\"", onResult) {
+            contentRepo.decline(content.id, text, adminUid)
+            _state.update { s ->
+                s.copy(
+                    teacherContents = s.teacherContents.map {
+                        if (it.id == content.id) {
+                            it.copy(
+                                status = ContentStatus.DECLINED,
+                                declineReason = text,
+                                reviewedAtMillis = System.currentTimeMillis()
+                            )
+                        } else it
+                    }
+                )
+            }
         }
     }
 

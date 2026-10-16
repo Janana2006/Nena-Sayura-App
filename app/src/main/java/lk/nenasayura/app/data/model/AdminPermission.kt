@@ -11,12 +11,13 @@ enum class AdminPermission(val key: String, val label: String, val hint: String)
     MARKING_SCHEMES("marking_schemes", "Marking Schemes", "Marking schemes section"),
     GUIDE_BOOKS("guide_books", "Guide Books", "Add and delete guide books"),
     QUIZZES("quizzes", "Quizzes", "Quizzes section"),
+    TEACHER_UPLOADS("teacher_uploads", "Teacher Uploads", "Review, approve or decline teacher uploads"),
     STREAMS("streams", "Streams & Subjects", "Add streams, subjects and kandas"),
     STAFF("staff", "Manage Staff", "See staff and add new staff members");
 
     companion object {
         /** Permissions that live inside the Content tab. */
-        val CONTENT: Set<AdminPermission> = setOf(PAPERS, MARKING_SCHEMES, GUIDE_BOOKS, QUIZZES, STREAMS)
+        val CONTENT: Set<AdminPermission> = setOf(PAPERS, MARKING_SCHEMES, GUIDE_BOOKS, QUIZZES, TEACHER_UPLOADS, STREAMS)
 
         /** null (old admin accounts with no "permissions" field) = full access. */
         fun fromKeys(keys: Collection<String>?): Set<AdminPermission> =

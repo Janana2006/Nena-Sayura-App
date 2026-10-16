@@ -47,6 +47,7 @@ import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherMaterialsScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 
 /**
@@ -402,7 +403,9 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             WriteReviewScreen(onBack = { navController.popBackStack() })
         }
         // Student-only screens: each is replaced by a real screen in its own task
-        placeholder(Routes.TEACHERS, "Teachers", navController)
+        composable(Routes.TEACHERS) {
+            TeacherMaterialsScreen(onBack = { navController.popBackStack() })
+        }
         placeholder(Routes.TIMETABLE, "Timetable", navController)
         placeholder(Routes.REMINDERS, "Reminders", navController)
         placeholder(Routes.ANALYTICS, "Study Analytics", navController)

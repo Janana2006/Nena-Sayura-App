@@ -36,6 +36,24 @@ class PaymentRepository(
         }
     }
 
+    /** Ids of the teachers this student has paid (used to unlock PAID material). */
+    suspend fun getPaidTeacherIds(studentId: String): Set<String> {
+        return try {
+            val snapshot = db.collection(COLLECTION)
+                .whereEqualTo("studentId", studentId)
+                .get()
+                .await()
+
+            snapshot.documents
+                .map { it.toPayment() }
+                .filter { it.isPaid }
+                .map { it.teacherId }
+                .toSet()
+        } catch (e: Exception) {
+            emptySet()
+        }
+    }
+
     private fun DocumentSnapshot.toPayment(): Payment {
         return Payment(
             id = id,

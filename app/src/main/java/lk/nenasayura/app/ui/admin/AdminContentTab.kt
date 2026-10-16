@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.data.model.AdminPermission
 
 private enum class ContentSection(val label: String, val permission: AdminPermission) {
+    TeacherUploads("Teacher Uploads", AdminPermission.TEACHER_UPLOADS),
     Papers("Papers", AdminPermission.PAPERS),
     MarkingSchemes("Marking Schemes", AdminPermission.MARKING_SCHEMES),
     GuideBooks("Guide Books", AdminPermission.GUIDE_BOOKS),
@@ -55,12 +56,16 @@ fun AdminContentTab(
                 FilterChip(
                     selected = s == section,
                     onClick = { sectionIndex = s.ordinal },
-                    label = { Text(s.label) }
+                    label = {
+                        val pending = if (s == ContentSection.TeacherUploads) state.pendingCount else 0
+                        Text(if (pending > 0) "${s.label} ($pending)" else s.label)
+                    }
                 )
             }
         }
 
         when (section) {
+            ContentSection.TeacherUploads -> TeacherUploadsSection(state, viewModel)
             ContentSection.Papers -> PapersSection(state, viewModel)
             ContentSection.MarkingSchemes -> MarkingSchemesSection(state)
             ContentSection.GuideBooks -> GuideBooksSection(state, viewModel)

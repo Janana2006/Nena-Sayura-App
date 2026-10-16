@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.model.TeacherProfile
@@ -142,10 +143,16 @@ class TeacherViewModel(
                     it.copy(
                         contents = it.contents.map { c ->
                             if (c.id == content.id) {
-                                c.copy(title = title.trim(), description = description.trim(), access = access)
+                                c.copy(
+                                    title = title.trim(),
+                                    description = description.trim(),
+                                    access = access,
+                                    status = ContentStatus.PENDING,
+                                    declineReason = ""
+                                )
                             } else c
                         },
-                        message = "Changes saved"
+                        message = "Changes saved. Sent to the admin for review."
                     )
                 }
             } catch (e: CancellationException) {
