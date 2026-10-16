@@ -1,9 +1,11 @@
 package lk.nenasayura.app.data.repository
 
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.Payment
+import lk.nenasayura.app.data.model.TeacherProfile
 
 /**
  * Repository for handling payment records from Firestore collection "payments".
@@ -52,6 +54,38 @@ class PaymentRepository(
         } catch (e: Exception) {
             emptySet()
         }
+    }
+
+    /**
+     * A student pays a teacher's fee. The record goes to the "payments" collection, which the
+     * teacher's earnings and the admin's payments tab already read.
+     * If the student has already paid this teacher nothing new is saved (no double charge).
+     */
+    suspend fun payTeacher(studentId: String, teacher: TeacherProfile, method: String) {
+        require(!teacher.isFree && teacher.fee > 0) { "This teacher is free. No payment is needed." }
+
+        if (teacher.uid in getPaidTeacherIds(studentId)) return
+
+        val studentName = try {
+            db.collection("users").document(studentId).get().await().getString("name") ?: ""
+        } catch (e: Exception) {
+            ""
+        }
+
+        val data = hashMapOf<String, Any>(
+            "studentId" to studentId,
+            "studentName" to studentName,
+            "teacherId" to teacher.uid,
+            "teacherName" to teacher.name,
+            "subjectId" to (teacher.subjectIds.firstOrNull() ?: ""),
+            "subjectName" to teacher.subjectNames.joinToString(", "),
+            "amount" to teacher.fee.toDouble(),
+            "status" to "paid",
+            "method" to method,
+            "commissionPercent" to getDefaultCommissionPercent(),
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+        db.collection(COLLECTION).add(data).await()
     }
 
     private fun DocumentSnapshot.toPayment(): Payment {

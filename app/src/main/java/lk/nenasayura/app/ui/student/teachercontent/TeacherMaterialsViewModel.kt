@@ -12,42 +12,54 @@ import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AccessType
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.TeacherContent
+import lk.nenasayura.app.data.model.TeacherProfile
 import lk.nenasayura.app.data.repository.PaymentRepository
 import lk.nenasayura.app.data.repository.TeacherContentRepository
+import lk.nenasayura.app.data.repository.TeacherProfileRepository
 
 data class TeacherMaterialsUiState(
     val loading: Boolean = true,
     val errorMessage: String? = null,
-    /** Only APPROVED uploads ever reach this list. */
+    /** The teacher whose page this is. */
+    val teacher: TeacherProfile? = null,
+    /** Only APPROVED uploads of this teacher ever reach this list. */
     val items: List<TeacherContent> = emptyList(),
-    /** Teachers this student has paid; their PAID material is unlocked. */
-    val paidTeacherIds: Set<String> = emptySet(),
+    /** true once this student has paid this teacher. */
+    val hasPaid: Boolean = false,
     val typeFilter: ContentType? = null
 ) {
     val shown: List<TeacherContent>
         get() = items.filter { typeFilter == null || it.type == typeFilter }
 
+    /** The student still has to pay this teacher before PAID material opens. */
+    val needsPayment: Boolean
+        get() = teacher?.isPaidTeacher == true && !hasPaid
+
     fun isUnlocked(item: TeacherContent): Boolean =
-        item.access == AccessType.FREE || item.teacherId in paidTeacherIds
+        item.access == AccessType.FREE || !needsPayment
 }
 
-/** What a student sees: material that the admin approved. */
+/** What a student sees on ONE teacher's page: the material the admin approved. */
 class TeacherMaterialsViewModel(
     private val contentRepository: TeacherContentRepository = TeacherContentRepository(),
-    private val paymentRepository: PaymentRepository = PaymentRepository()
+    private val paymentRepository: PaymentRepository = PaymentRepository(),
+    private val teacherRepository: TeacherProfileRepository = TeacherProfileRepository()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(TeacherMaterialsUiState())
     val state: StateFlow<TeacherMaterialsUiState> = _state.asStateFlow()
 
-    fun load() {
+    fun load(teacherId: String) {
         _state.update { it.copy(loading = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                val items = contentRepository.getApprovedContents()
+                val teacher = teacherRepository.getProfile(teacherId, "", "")
+                val items = contentRepository.getApprovedContents(teacherId)
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
-                val paid = if (uid != null) paymentRepository.getPaidTeacherIds(uid) else emptySet()
-                _state.update { it.copy(loading = false, items = items, paidTeacherIds = paid) }
+                val paid = if (uid != null) teacherId in paymentRepository.getPaidTeacherIds(uid) else false
+                _state.update {
+                    it.copy(loading = false, teacher = teacher, items = items, hasPaid = paid)
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

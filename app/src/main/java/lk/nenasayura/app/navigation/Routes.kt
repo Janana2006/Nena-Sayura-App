@@ -35,7 +35,12 @@ object Routes {
     fun quizRoute(quizId: String) = "quiz/$quizId"
 
     // Student-only screens (reached from Student Home)
+    // My teacher flow: teacher list -> teacher materials -> payment -> back to materials (unlocked)
     const val TEACHERS = "teachers"
+    const val TEACHER_MATERIALS = "teachers/{teacherId}"
+    fun teacherMaterialsRoute(teacherId: String) = "teachers/$teacherId"
+    const val TEACHER_PAYMENT = "teachers/{teacherId}/pay"
+    fun teacherPaymentRoute(teacherId: String) = "teachers/$teacherId/pay"
     const val TIMETABLE = "timetable"
     const val REMINDERS = "reminders"
     const val ANALYTICS = "analytics"

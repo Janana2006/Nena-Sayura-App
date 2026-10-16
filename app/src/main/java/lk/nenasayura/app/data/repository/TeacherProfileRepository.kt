@@ -1,7 +1,9 @@
 package lk.nenasayura.app.data.repository
 
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.TeacherProfile
 
@@ -15,6 +17,31 @@ class TeacherProfileRepository(
         if (!doc.exists()) {
             return TeacherProfile(uid = uid, name = fallbackName, email = fallbackEmail)
         }
+        return doc.toTeacherProfile(fallbackName, fallbackEmail)
+    }
+
+    /**
+     * Every teacher account, for the student's "My teacher" list.
+     * Teachers are found two ways: role = "teacher" (active role) and roles contains "teacher"
+     * (a student who also added the teacher role, so their active role may be "student").
+     */
+    suspend fun getAllTeachers(): List<TeacherProfile> {
+        val users = db.collection(USERS)
+        val byRole = users.whereEqualTo("role", "teacher").get().await().documents
+        val byRoles = try {
+            users.whereArrayContains("roles", "teacher").get().await().documents
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emptyList()
+        }
+        return (byRole + byRoles)
+            .distinctBy { it.id }
+            .map { it.toTeacherProfile("", "") }
+    }
+
+    private fun DocumentSnapshot.toTeacherProfile(fallbackName: String, fallbackEmail: String): TeacherProfile {
+        val doc = this
 
         // A student who later added the teacher role keeps the teaching subject in "teacherStudy"
         @Suppress("UNCHECKED_CAST")
@@ -24,7 +51,7 @@ class TeacherProfileRepository(
             ((study?.get(key) ?: doc.get(key)) as? List<*>)?.filterIsInstance<String>() ?: emptyList()
 
         return TeacherProfile(
-            uid = uid,
+            uid = doc.id,
             name = doc.getString("name")?.ifBlank { null } ?: fallbackName,
             email = doc.getString("email")?.ifBlank { null } ?: fallbackEmail,
             bio = doc.getString("bio") ?: "",

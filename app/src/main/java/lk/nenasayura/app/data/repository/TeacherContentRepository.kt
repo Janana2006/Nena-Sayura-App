@@ -147,6 +147,18 @@ class TeacherContentRepository(
             .sortedByDescending { it.createdAtMillis }
     }
 
+    /** Only APPROVED uploads of ONE teacher, newest first (the student's teacher page). */
+    suspend fun getApprovedContents(teacherId: String): List<TeacherContent> {
+        val snapshot = db.collection(COLLECTION)
+            .whereEqualTo("status", ContentStatus.APPROVED.key)
+            .whereEqualTo("teacherId", teacherId)
+            .get()
+            .await()
+        return snapshot.documents
+            .map { it.toContent() }
+            .sortedByDescending { it.createdAtMillis }
+    }
+
     // ---------------- admin ----------------
 
     /**

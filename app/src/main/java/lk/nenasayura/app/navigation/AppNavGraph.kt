@@ -47,7 +47,9 @@ import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherListScreen
 import lk.nenasayura.app.ui.student.teachercontent.TeacherMaterialsScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherPaymentScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 
 /**
@@ -403,8 +405,43 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             WriteReviewScreen(onBack = { navController.popBackStack() })
         }
         // Student-only screens: each is replaced by a real screen in its own task
+        // My teacher: 1) teacher list (free first, then paid)
         composable(Routes.TEACHERS) {
-            TeacherMaterialsScreen(onBack = { navController.popBackStack() })
+            TeacherListScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTeacher = { teacherId ->
+                    navController.navigate(Routes.teacherMaterialsRoute(teacherId))
+                }
+            )
+        }
+        // 2) the chosen teacher's materials (paid teacher: fee + Pay button)
+        composable(
+            route = Routes.TEACHER_MATERIALS,
+            arguments = listOf(navArgument("teacherId") { type = NavType.StringType })
+        ) { entry ->
+            val teacherId = entry.arguments?.getString("teacherId").orEmpty()
+            TeacherMaterialsScreen(
+                teacherId = teacherId,
+                onBack = { navController.popBackStack() },
+                onPay = { navController.navigate(Routes.teacherPaymentRoute(teacherId)) }
+            )
+        }
+        // 3) payment dashboard -> confirm -> success -> back to the (now unlocked) materials
+        composable(
+            route = Routes.TEACHER_PAYMENT,
+            arguments = listOf(navArgument("teacherId") { type = NavType.StringType })
+        ) { entry ->
+            val teacherId = entry.arguments?.getString("teacherId").orEmpty()
+            TeacherPaymentScreen(
+                teacherId = teacherId,
+                onBack = { navController.popBackStack() },
+                onPaid = {
+                    // Remove the old materials screen + payment screen, then open a fresh materials screen
+                    navController.navigate(Routes.teacherMaterialsRoute(teacherId)) {
+                        popUpTo(Routes.TEACHER_MATERIALS) { inclusive = true }
+                    }
+                }
+            )
         }
         placeholder(Routes.TIMETABLE, "Timetable", navController)
         placeholder(Routes.REMINDERS, "Reminders", navController)
