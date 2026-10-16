@@ -61,7 +61,7 @@ class TeacherProfileRepository(
             subjectIds = stringList("subjectIds"),
             subjectNames = stringList("subjectNames"),
             isFree = doc.getBoolean("isFree") ?: true,
-            fee = (doc.getLong("fee") ?: 0L).toInt()
+            fee = (doc.get("fee") as? Number)?.toInt() ?: 0
         )
     }
 

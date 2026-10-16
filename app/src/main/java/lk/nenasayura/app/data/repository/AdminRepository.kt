@@ -53,12 +53,13 @@ class AdminRepository(
                     email = doc.getString("email") ?: "",
                     role = doc.getString("role") ?: "student",
                     isFree = doc.getBoolean("isFree") ?: true,
-                    fee = (doc.getLong("fee") ?: 0L).toInt(),
+                    fee = (doc.get("fee") as? Number)?.toInt() ?: 0,
                     streamName = doc.getString("streamName") ?: "",
                     subjectNames = (doc.get("subjectNames") as? List<*>)
                         ?.filterIsInstance<String>() ?: emptyList(),
                     staffRole = doc.getString("staffRole") ?: "",
-                    permissions = (doc.get("permissions") as? List<*>)?.filterIsInstance<String>()
+                    permissions = (doc.get("permissions") as? List<*>)?.filterIsInstance<String>(),
+                    loginMethod = doc.getString("loginMethod") ?: ""
                 )
             }
             .sortedBy { it.name.lowercase() }
@@ -86,6 +87,7 @@ class AdminRepository(
                     "name" to name.trim(),
                     "email" to email.trim(),
                     "role" to "admin",
+                    "loginMethod" to "email",
                     "staffRole" to staffRole,
                     "permissions" to permissions.map { it.key },
                     "setupDone" to true,

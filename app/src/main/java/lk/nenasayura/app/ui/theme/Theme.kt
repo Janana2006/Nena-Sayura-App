@@ -16,8 +16,20 @@ private val DarkColorScheme = darkColorScheme(
     onPrimary = NenaOnPrimaryDark,
     secondary = NenaSecondaryDark,
     tertiary = NenaAccentDark,
+    primaryContainer = Color(0xFF28408F),
+    onPrimaryContainer = Color(0xFFDCE4FF),
+    secondaryContainer = Color(0xFF0F4F47),
+    onSecondaryContainer = Color(0xFFCDEDE7),
+    tertiaryContainer = Color(0xFF5A4300),
+    onTertiaryContainer = Color(0xFFFFE9B8),
     background = NenaBackgroundDark,
-    surface = NenaSurfaceDark
+    onBackground = Color(0xFFE6E8F2),
+    surface = NenaSurfaceDark,
+    onSurface = Color(0xFFE6E8F2),
+    surfaceVariant = Color(0xFF262B3D),
+    onSurfaceVariant = Color(0xFFB0B6C8),
+    outline = Color(0xFF6B7288),
+    outlineVariant = Color(0xFF343A50)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -33,7 +45,11 @@ private val LightColorScheme = lightColorScheme(
     onTertiary = Color.Black,
     tertiaryContainer = NenaAccentContainer,
     background = NenaBackground,
-    surface = NenaSurface
+    surface = NenaSurface,
+    surfaceVariant = Color(0xFFE9ECF4),
+    onSurfaceVariant = Color(0xFF5B6478),
+    outline = Color(0xFF8A93A8),
+    outlineVariant = Color(0xFFE3E7F0)
 )
 
 @Composable

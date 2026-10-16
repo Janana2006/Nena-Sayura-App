@@ -77,7 +77,7 @@ fun AdminStaffTab(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionTitle("Your team", modifier = Modifier.weight(1f))
-            Pill("${state.staff.size} admins", NenaPrimaryContainer, NenaPrimary)
+            Pill("${state.staff.size} admins", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
         }
         Text(
             text = "Other admins log in from the normal Login screen with the email and password you set. " +
@@ -103,7 +103,7 @@ fun AdminStaffTab(
                     InitialsAvatar(
                         initials = initialsOf(member.name, member.email),
                         size = 44.dp,
-                        tint = if (isMe) NenaPrimary else NenaSecondary
+                        tint = if (isMe) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
@@ -118,7 +118,7 @@ fun AdminStaffTab(
                             )
                             if (isMe) {
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Pill("You", NenaPrimaryContainer, NenaPrimary)
+                                Pill("You", MaterialTheme.colorScheme.primaryContainer, MaterialTheme.colorScheme.primary)
                             }
                         }
                         Text(
@@ -127,7 +127,7 @@ fun AdminStaffTab(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Pill(member.staffRoleLabel, NenaSecondaryContainer, NenaSecondary)
+                        Pill(member.staffRoleLabel, MaterialTheme.colorScheme.secondaryContainer, MaterialTheme.colorScheme.secondary)
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = accessSummary(member),
@@ -137,7 +137,7 @@ fun AdminStaffTab(
                     }
                     if (!isMe) {
                         IconButton(onClick = { editing = member }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit access", tint = NenaPrimary)
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit access", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
