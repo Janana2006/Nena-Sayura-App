@@ -81,6 +81,7 @@ class AuthRepository(
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
+                    recordLoginMethod("email")
                     onResult(Result.success(Unit))
                     return@addOnCompleteListener
                 }
@@ -94,8 +95,10 @@ class AuthRepository(
                 ) {
                     auth.signInWithEmailAndPassword(email, withoutSpaces)
                         .addOnCompleteListener { retry ->
-                            if (retry.isSuccessful) onResult(Result.success(Unit))
-                            else onResult(Result.failure(retry.exception ?: error))
+                            if (retry.isSuccessful) {
+                                recordLoginMethod("email")
+                                onResult(Result.success(Unit))
+                            } else onResult(Result.failure(retry.exception ?: error))
                         }
                 } else {
                     onResult(Result.failure(error ?: Exception("Login failed")))
@@ -133,6 +136,7 @@ class AuthRepository(
                         "name" to name,
                         "email" to email,
                         "role" to role,
+                        "loginMethod" to "email",
                         "isFree" to isFree,
                         "fee" to fee,
                         "setupDone" to false   // teacher saha student dekatama stream/subject select karanna oni
@@ -159,6 +163,7 @@ class AuthRepository(
         val data = hashMapOf<String, Any>(
             "uid" to user.uid,
             "role" to role,
+            "loginMethod" to if (user.providerData.any { it.providerId == GoogleAuthProvider.PROVIDER_ID }) "google" else "email",
             "isFree" to isFree,
             "fee" to fee,
             "setupDone" to false        // dan stream/subjects select karanna oni
@@ -203,9 +208,23 @@ class AuthRepository(
         val credential = GoogleAuthProvider.getCredential(idToken, null)
         auth.signInWithCredential(credential)
             .addOnCompleteListener { task ->
-                if (task.isSuccessful) onResult(Result.success(Unit))
-                else onResult(Result.failure(task.exception ?: Exception("Google login failed")))
+                if (task.isSuccessful) {
+                    recordLoginMethod("google")
+                    onResult(Result.success(Unit))
+                } else onResult(Result.failure(task.exception ?: Exception("Google login failed")))
             }
+    }
+
+    /**
+     * Saves how this account signs in, so the Admin > Users list can show it.
+     * update() only works when the profile already exists, so a brand new Google user
+     * is NOT given a half-empty profile here (saveRole writes it later with the role).
+     * Old accounts get filled in the next time they log in.
+     */
+    private fun recordLoginMethod(method: String) {
+        val uid = auth.currentUser?.uid ?: return
+        db.collection("users").document(uid).update("loginMethod", method)
+            .addOnFailureListener { Log.d("AuthRepository", "loginMethod not saved yet: ${it.message}") }
     }
 
     fun logout() {
