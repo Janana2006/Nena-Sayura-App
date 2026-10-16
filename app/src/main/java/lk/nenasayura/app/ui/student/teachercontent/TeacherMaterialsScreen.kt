@@ -74,7 +74,7 @@ private val TealText = Color(0xFF004D40)
 private val LockedGrey = Color(0xFFB0B6C3)
 
 /**
- * Student screen: one teacher's notes, tutes, papers and videos (admin-approved only).
+ * Student screen: one teacher's notes, tutes, papers and videos (live as soon as the teacher uploads).
  * A paid teacher shows the fee and an Unlock button until the student has paid.
  */
 @Composable

@@ -20,7 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Payments
-import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
@@ -39,6 +38,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
@@ -56,6 +59,12 @@ fun AdminDashboardTab(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // teacher uploads the admin has not looked at yet (shown in the banner below)
+    val context = LocalContext.current
+    UploadSeenStore.init(context)
+    val seenUploads by UploadSeenStore.seen.collectAsStateWithLifecycle()
+    val newUploads = UploadSeenStore.newCount(state.teacherContents, seenUploads)
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -126,8 +135,8 @@ fun AdminDashboardTab(
                 }
             }
 
-            // ---- Teacher uploads waiting for approval ----
-            if (state.can(AdminPermission.TEACHER_UPLOADS) && state.pendingCount > 0) {
+            // ---- New teacher uploads the admin has not looked at yet ----
+            if (state.can(AdminPermission.TEACHER_UPLOADS) && newUploads > 0) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Card(
                     onClick = onOpenContent,
@@ -141,21 +150,21 @@ fun AdminDashboardTab(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = Icons.Filled.PendingActions,
+                            imageVector = Icons.Filled.Folder,
                             contentDescription = null,
                             tint = Color(0xFF6B4A00),
                             modifier = Modifier.size(32.dp)
                         )
                         Column(modifier = Modifier.padding(start = 14.dp)) {
                             Text(
-                                text = "${state.pendingCount} teacher upload" +
-                                        (if (state.pendingCount == 1) "" else "s") + " waiting for review",
+                                text = "$newUploads new teacher upload" +
+                                        (if (newUploads == 1) "" else "s"),
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF3B2A00)
                             )
                             Text(
-                                text = "Tap to approve or decline",
+                                text = "Tap to view or remove",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF6B4A00)
                             )

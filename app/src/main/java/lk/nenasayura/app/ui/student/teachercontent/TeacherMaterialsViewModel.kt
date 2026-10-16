@@ -22,7 +22,7 @@ data class TeacherMaterialsUiState(
     val errorMessage: String? = null,
     /** The teacher whose page this is. */
     val teacher: TeacherProfile? = null,
-    /** Only APPROVED uploads of this teacher ever reach this list. */
+    /** Every upload of this teacher (no approval step). */
     val items: List<TeacherContent> = emptyList(),
     /** true once this student has paid this teacher. */
     val hasPaid: Boolean = false,
@@ -39,7 +39,7 @@ data class TeacherMaterialsUiState(
         item.access == AccessType.FREE || !needsPayment
 }
 
-/** What a student sees on ONE teacher's page: the material the admin approved. */
+/** What a student sees on ONE teacher's page: the material this teacher uploaded. */
 class TeacherMaterialsViewModel(
     private val contentRepository: TeacherContentRepository = TeacherContentRepository(),
     private val paymentRepository: PaymentRepository = PaymentRepository(),
@@ -54,7 +54,7 @@ class TeacherMaterialsViewModel(
         viewModelScope.launch {
             try {
                 val teacher = teacherRepository.getProfile(teacherId, "", "")
-                val items = contentRepository.getApprovedContents(teacherId)
+                val items = contentRepository.getVisibleContents(teacherId)
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 val paid = if (uid != null) teacherId in paymentRepository.getPaidTeacherIds(uid) else false
                 _state.update {

@@ -3,7 +3,6 @@ package lk.nenasayura.app.ui.admin
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +11,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AdminPermission
 import lk.nenasayura.app.data.model.AppUser
-import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Paper
 import lk.nenasayura.app.data.model.Payment
@@ -46,7 +44,7 @@ data class AdminUiState(
     val papers: List<Paper> = emptyList(),
     val guideBooks: List<GuideBook> = emptyList(),
     val streams: List<StudyStream> = emptyList(),
-    /** Every teacher upload (pending, approved and declined) for the review screen. */
+    /** Every teacher upload, for the admin to look at and remove. */
     val teacherContents: List<TeacherContent> = emptyList(),
     /** True while something is being saved / uploaded. */
     val busy: Boolean = false,
@@ -55,9 +53,6 @@ data class AdminUiState(
 ) {
     fun can(permission: AdminPermission): Boolean = permission in access
     val canSeeContent: Boolean get() = access.any { it in AdminPermission.CONTENT }
-
-    /** Teacher uploads still waiting for this admin's decision. */
-    val pendingCount: Int get() = teacherContents.count { it.status == ContentStatus.PENDING }
 
     val students: List<AppUser> get() = users.filter { it.isStudent }
     val teachers: List<AppUser> get() = users.filter { it.isTeacher }
@@ -351,51 +346,14 @@ class AdminViewModel(
         }
     }
 
-    // ---------------- teacher uploads (approve / decline) ----------------
+    // ---------------- teacher uploads (remove) ----------------
 
-    /** Makes the upload visible to students and clears any old decline message. */
-    fun approveContent(content: TeacherContent) {
-        val adminUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        act("Approved \"${content.title}\"", this::toast) {
-            contentRepo.approve(content.id, adminUid)
+    /** Removes a teacher's upload for good. Students and the teacher no longer see it. */
+    fun removeContent(content: TeacherContent) {
+        act("Removed \"${content.title}\"", this::toast) {
+            contentRepo.delete(content)
             _state.update { s ->
-                s.copy(
-                    teacherContents = s.teacherContents.map {
-                        if (it.id == content.id) {
-                            it.copy(
-                                status = ContentStatus.APPROVED,
-                                declineReason = "",
-                                reviewedAtMillis = System.currentTimeMillis()
-                            )
-                        } else it
-                    }
-                )
-            }
-        }
-    }
-
-    /** Declines the upload. The reason is saved so the teacher can read it. */
-    fun declineContent(content: TeacherContent, reason: String, onResult: (String?) -> Unit) {
-        val text = reason.trim()
-        if (text.length < 5) {
-            onResult("Please write a short reason so the teacher knows what to fix.")
-            return
-        }
-        val adminUid = FirebaseAuth.getInstance().currentUser?.uid.orEmpty()
-        act("Declined \"${content.title}\"", onResult) {
-            contentRepo.decline(content.id, text, adminUid)
-            _state.update { s ->
-                s.copy(
-                    teacherContents = s.teacherContents.map {
-                        if (it.id == content.id) {
-                            it.copy(
-                                status = ContentStatus.DECLINED,
-                                declineReason = text,
-                                reviewedAtMillis = System.currentTimeMillis()
-                            )
-                        } else it
-                    }
-                )
+                s.copy(teacherContents = s.teacherContents.filter { it.id != content.id })
             }
         }
     }

@@ -17,10 +17,8 @@ import lk.nenasayura.app.util.CloudinaryUploader
  * Teacher uploads: the file goes to Cloudinary, the details go to the
  * Firestore "teacher_content" collection.
  *
- * Approval flow:
- *   teacher uploads  -> status = "pending"
- *   admin approves   -> status = "approved"  (students can see it)
- *   admin declines   -> status = "declined"  + declineReason (teacher sees it)
+ * No approval step: when a teacher uploads, students can see it right away.
+ * The admin sees every upload in the admin dashboard and can remove any of them.
  */
 class TeacherContentRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -84,7 +82,7 @@ class TeacherContentRepository(
                 .getOrThrow()
         }
 
-        // 2) Save the details in Firestore. Every new upload starts as PENDING.
+        // 2) Save the details in Firestore. The upload is live for students at once.
         val data = hashMapOf(
             "teacherId" to teacherId,
             "teacherName" to teacherName,
@@ -101,7 +99,7 @@ class TeacherContentRepository(
             "answerFileName" to answerFileName,
             "answerStoragePath" to "",
             "videoUrl" to videoUrl.trim(),
-            "status" to ContentStatus.PENDING.key,
+            "status" to ContentStatus.APPROVED.key,
             "declineReason" to "",
             "createdAt" to FieldValue.serverTimestamp()
         )
@@ -110,18 +108,14 @@ class TeacherContentRepository(
 
     /**
      * Edits the text and the Free/Paid choice (the file itself is not replaced).
-     * The edited item goes back to PENDING so the admin checks the new version.
+     * Students see the change right away.
      */
     suspend fun update(id: String, title: String, description: String, access: AccessType) {
         db.collection(COLLECTION).document(id).update(
             mapOf(
                 "title" to title.trim(),
                 "description" to description.trim(),
-                "access" to access.key,
-                "status" to ContentStatus.PENDING.key,
-                "declineReason" to "",
-                "reviewedAt" to FieldValue.delete(),
-                "reviewedBy" to FieldValue.delete()
+                "access" to access.key
             )
         ).await()
     }
@@ -136,33 +130,35 @@ class TeacherContentRepository(
 
     // ---------------- student ----------------
 
-    /** Only APPROVED uploads, newest first. This is all a student may see. */
-    suspend fun getApprovedContents(): List<TeacherContent> {
-        val snapshot = db.collection(COLLECTION)
-            .whereEqualTo("status", ContentStatus.APPROVED.key)
-            .get()
-            .await()
+    /**
+     * Everything students can see, newest first. There is no approval step, so every
+     * upload counts. Only items an old review had DECLINED stay hidden.
+     * (When the admin removes an upload it is deleted, so it is simply gone.)
+     */
+    suspend fun getVisibleContents(): List<TeacherContent> {
+        val snapshot = db.collection(COLLECTION).get().await()
         return snapshot.documents
             .map { it.toContent() }
+            .filter { it.status != ContentStatus.DECLINED }
             .sortedByDescending { it.createdAtMillis }
     }
 
-    /** Only APPROVED uploads of ONE teacher, newest first (the student's teacher page). */
-    suspend fun getApprovedContents(teacherId: String): List<TeacherContent> {
+    /** The same, for ONE teacher (the student's teacher page). */
+    suspend fun getVisibleContents(teacherId: String): List<TeacherContent> {
         val snapshot = db.collection(COLLECTION)
-            .whereEqualTo("status", ContentStatus.APPROVED.key)
             .whereEqualTo("teacherId", teacherId)
             .get()
             .await()
         return snapshot.documents
             .map { it.toContent() }
+            .filter { it.status != ContentStatus.DECLINED }
             .sortedByDescending { it.createdAtMillis }
     }
 
     // ---------------- admin ----------------
 
     /**
-     * Every upload of every teacher, newest first, for the admin review screen.
+     * Every upload of every teacher, newest first, for the admin dashboard.
      * Old documents made before the approval flow have no "status"; they are
      * marked "approved" here once, so they keep showing to students.
      */
@@ -185,28 +181,6 @@ class TeacherContentRepository(
         return snapshot.documents
             .map { it.toContent() }
             .sortedByDescending { it.createdAtMillis }
-    }
-
-    suspend fun approve(id: String, adminUid: String) {
-        db.collection(COLLECTION).document(id).update(
-            mapOf(
-                "status" to ContentStatus.APPROVED.key,
-                "declineReason" to "",
-                "reviewedAt" to FieldValue.serverTimestamp(),
-                "reviewedBy" to adminUid
-            )
-        ).await()
-    }
-
-    suspend fun decline(id: String, reason: String, adminUid: String) {
-        db.collection(COLLECTION).document(id).update(
-            mapOf(
-                "status" to ContentStatus.DECLINED.key,
-                "declineReason" to reason.trim(),
-                "reviewedAt" to FieldValue.serverTimestamp(),
-                "reviewedBy" to adminUid
-            )
-        ).await()
     }
 
     // If the real field names differ, change them here only.

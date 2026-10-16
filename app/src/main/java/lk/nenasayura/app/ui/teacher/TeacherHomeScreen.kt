@@ -144,7 +144,7 @@ fun TeacherHomeScreen(
                 TeacherTab.Upload -> UploadScreen(
                     profile = profile,
                     onUploaded = {
-                        viewModel.refreshContent(message = "Uploaded. Waiting for admin approval.")
+                        viewModel.refreshContent(message = "Uploaded. Students can see it now.")
                         selectedIndex = TeacherTab.Content.ordinal
                     },
                     modifier = Modifier.padding(innerPadding)

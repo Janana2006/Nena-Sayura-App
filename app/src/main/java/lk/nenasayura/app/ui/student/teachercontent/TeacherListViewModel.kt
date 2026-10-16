@@ -27,7 +27,7 @@ data class TeacherListUiState(
     val teachers: List<TeacherProfile> = emptyList(),
     /** Teachers this student has already paid. */
     val paidTeacherIds: Set<String> = emptySet(),
-    /** teacherId -> number of approved materials. Only teachers with at least one are listed. */
+    /** teacherId -> number of materials. Only teachers with at least one are listed. */
     val materialCounts: Map<String, Int> = emptyMap()
 ) {
     /** Free teachers are shown first. */
@@ -54,8 +54,8 @@ class TeacherListViewModel(
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
                 // A student who is also a teacher should not see themselves in the list
-                // Only teachers who have uploaded (admin-approved) materials are listed
-                val counts = contentRepository.getApprovedContents()
+                // Only teachers who have uploaded materials are listed
+                val counts = contentRepository.getVisibleContents()
                     .groupingBy { it.teacherId }
                     .eachCount()
                 val teachers = teacherRepository.getAllTeachers()
