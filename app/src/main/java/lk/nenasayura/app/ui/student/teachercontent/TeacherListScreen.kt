@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -139,7 +140,7 @@ fun TeacherListScreen(
                 )
 
                 state.teachers.isEmpty() -> EmptyView(
-                    message = "No teachers have joined yet.",
+                    message = "No teacher has uploaded any materials yet.",
                     modifier = Modifier.weight(1f)
                 )
 
@@ -191,7 +192,7 @@ fun TeacherListScreen(
                     if (free.isEmpty() && paid.isEmpty()) {
                         NoTeachersFound(
                             message = if (q.isNotEmpty()) "No teachers match \"$query\"."
-                            else "No teachers for your subjects yet.",
+                            else "No teachers with materials for your subjects yet.",
                             canShowAll = q.isEmpty() && !showAll,
                             onShowAll = { showAll = true; subjectFilter = null },
                             onChange = onChangeSelection,
@@ -215,6 +216,7 @@ fun TeacherListScreen(
                                 items(free, key = { "free_" + it.uid }) { teacher ->
                                     TeacherCard(
                                         teacher = teacher,
+                                        materialCount = state.materialCounts[teacher.uid] ?: 0,
                                         alreadyPaid = false,
                                         onClick = { onOpenTeacher(teacher.uid) }
                                     )
@@ -232,6 +234,7 @@ fun TeacherListScreen(
                                 items(paid, key = { "paid_" + it.uid }) { teacher ->
                                     TeacherCard(
                                         teacher = teacher,
+                                        materialCount = state.materialCounts[teacher.uid] ?: 0,
                                         alreadyPaid = teacher.uid in state.paidTeacherIds,
                                         onClick = { onOpenTeacher(teacher.uid) }
                                     )
@@ -411,6 +414,7 @@ private fun SectionHeader(
 @Composable
 private fun TeacherCard(
     teacher: TeacherProfile,
+    materialCount: Int,
     alreadyPaid: Boolean,
     onClick: () -> Unit
 ) {
@@ -484,6 +488,12 @@ private fun TeacherCard(
                         } else {
                             IconPill("Free", NenaSecondaryContainer, TealText, Icons.Filled.CardGiftcard)
                         }
+                        IconPill(
+                            text = if (materialCount == 1) "1 material" else "$materialCount materials",
+                            background = MaterialTheme.colorScheme.surfaceVariant,
+                            textColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            icon = Icons.Filled.Description
+                        )
                     }
                 }
 
