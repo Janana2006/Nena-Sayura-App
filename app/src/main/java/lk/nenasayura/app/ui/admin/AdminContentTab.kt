@@ -73,8 +73,8 @@ fun AdminContentTab(
     val context = LocalContext.current
     UploadSeenStore.init(context)
     val seen by UploadSeenStore.seen.collectAsStateWithLifecycle()
-    // teacher uploads the admin has not looked at yet
-    val newUploads = UploadSeenStore.newCount(state.teacherContents, seen)
+    // pending uploads + uploads the admin has not looked at yet
+    val newUploads = UploadSeenStore.attentionCount(state.teacherContents, seen)
 
     // Only the sections this admin was given access to
     val sections = ContentSection.entries.filter { state.can(it.permission) }

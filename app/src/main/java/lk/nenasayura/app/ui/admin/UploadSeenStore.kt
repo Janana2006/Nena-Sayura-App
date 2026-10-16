@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.TeacherContent
 
 /**
@@ -39,6 +40,12 @@ object UploadSeenStore {
         prefs?.edit()?.putLong(teacherId, uploadMillis)?.apply()
         _seen.update { it + (teacherId to uploadMillis) }
     }
+
+    /** Pending uploads (they need a decision) plus uploads the admin has not looked at yet. */
+    fun attentionCount(contents: List<TeacherContent>, seen: Map<String, Long>): Int =
+        contents.count {
+            it.status == ContentStatus.PENDING || it.createdAtMillis > (seen[it.teacherId] ?: 0L)
+        }
 
     /** How many of [contents] the admin has not seen yet. */
     fun newCount(contents: List<TeacherContent>, seen: Map<String, Long>): Int =

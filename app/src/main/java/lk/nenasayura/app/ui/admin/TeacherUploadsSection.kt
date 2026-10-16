@@ -26,11 +26,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -40,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -61,6 +65,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.ui.common.EmptyView
@@ -76,6 +81,7 @@ import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 import lk.nenasayura.app.util.FileActions
 
+private val PendingAmber = Color(0xFFF9A825)
 private val NewRed = Color(0xFFE53935)
 private val NewRedSoft = Color(0xFFFFE3E0)
 private val NewRedText = Color(0xFFC62828)
@@ -100,6 +106,9 @@ private class TeacherGroup(
             }
             .joinToString(" \u2022 ")
 
+    /** Uploads waiting for the admin's decision. */
+    val pendingCount: Int get() = uploads.count { it.status == ContentStatus.PENDING }
+
     val subjects: String
         get() = uploads.map { it.subjectName }.filter { it.isNotBlank() }.distinct().joinToString(", ")
 }
@@ -110,7 +119,9 @@ private class TeacherGroup(
  *         uploads the admin has not looked at yet; it goes away after opening the teacher
  *         and comes back when the teacher uploads again.
  * Step 2: tap a teacher to see only that teacher's uploads, and remove any of them.
- * There is no approval step: students see an upload as soon as the teacher saves it.
+ * Uploads of teachers who registered as teachers are live at once.
+ * Uploads of students who became teachers arrive as PENDING: the admin approves them
+ * (students then see them) or declines them with a reason (the teacher reads it).
  */
 @Composable
 fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
@@ -123,7 +134,12 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
     // What the admin had already seen when this teacher was opened (to mark the NEW uploads)
     var seenAtOpen by remember { mutableLongStateOf(0L) }
     var typeFilter by remember { mutableStateOf<ContentType?>(null) }
+    var statusFilter by remember { mutableStateOf<ContentStatus?>(null) }
     var removing by remember { mutableStateOf<TeacherContent?>(null) }
+    // decline dialog
+    var declining by remember { mutableStateOf<TeacherContent?>(null) }
+    var declineText by remember { mutableStateOf("") }
+    var declineError by remember { mutableStateOf<String?>(null) }
 
     // Group the uploads by teacher; the teacher with the newest upload comes first
     val groups = state.teacherContents
@@ -139,13 +155,15 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
                 uploads = items.sortedByDescending { it.createdAtMillis }
             )
         }
-        .sortedByDescending { it.lastUploadMillis }
+        // teachers with uploads waiting for a decision first, then the newest upload
+        .sortedWith(compareByDescending<TeacherGroup> { it.pendingCount > 0 }.thenByDescending { it.lastUploadMillis })
 
     val selected = groups.firstOrNull { it.teacherId == selectedId }
 
     fun closeTeacher() {
         selectedId = null
         typeFilter = null
+        statusFilter = null
     }
 
     // Back goes from a teacher's uploads to the teacher list first
@@ -202,6 +220,7 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
                     TeacherRow(
                         group = group,
                         newCount = group.uploads.count { it.createdAtMillis > lastSeen },
+                        pendingCount = group.pendingCount,
                         onClick = {
                             // remember what was new, then mark everything as seen
                             seenAtOpen = lastSeen
@@ -215,7 +234,10 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
     } else {
         // ---------------------------------------------------------- one teacher's uploads
         val uploads = selected?.uploads.orEmpty()
-        val shownUploads = uploads.filter { typeFilter == null || it.type == typeFilter }
+        val shownUploads = uploads.filter {
+            (typeFilter == null || it.type == typeFilter) &&
+                    (statusFilter == null || it.status == statusFilter)
+        }
         val chipColors = FilterChipDefaults.filterChipColors(
             selectedContainerColor = NenaPrimaryContainer,
             selectedLabelColor = NenaPrimary
@@ -275,6 +297,8 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
                             HeroChip("${uploads.size} upload${if (uploads.size == 1) "" else "s"}")
                             HeroChip("${uploads.count { it.access == AccessType.FREE }} free")
                             HeroChip("${uploads.count { it.access == AccessType.PAID }} paid")
+                            val pending = uploads.count { it.status == ContentStatus.PENDING }
+                            if (pending > 0) HeroChip("$pending pending")
                         }
                     }
                 }
@@ -314,6 +338,41 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
                 }
             }
 
+            // Pending / Live / Declined filter (only the statuses this teacher has)
+            if (uploads.map { it.status }.distinct().size > 1) {
+                item {
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = statusFilter == null,
+                            onClick = { statusFilter = null },
+                            label = { Text("Any status") },
+                            colors = chipColors
+                        )
+                        ContentStatus.entries
+                            .filter { st -> uploads.any { it.status == st } }
+                            .forEach { st ->
+                                FilterChip(
+                                    selected = statusFilter == st,
+                                    onClick = { statusFilter = st },
+                                    label = {
+                                        Text(
+                                            "${when (st) {
+                                                ContentStatus.PENDING -> "Pending"
+                                                ContentStatus.APPROVED -> "Live"
+                                                ContentStatus.DECLINED -> "Declined"
+                                            }}  ${uploads.count { it.status == st }}"
+                                        )
+                                    },
+                                    colors = chipColors
+                                )
+                            }
+                    }
+                }
+            }
+
             if (shownUploads.isEmpty()) {
                 item {
                     EmptyView(
@@ -328,11 +387,61 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
                         isNew = content.createdAtMillis > seenAtOpen,
                         onOpen = { FileActions.openFile(context, content.openUrl, content.title) },
                         onOpenAnswer = { FileActions.openFile(context, content.answerFileUrl, content.title) },
+                        onApprove = { viewModel.approveContent(content) },
+                        onDecline = {
+                            declining = content
+                            declineText = ""
+                            declineError = null
+                        },
                         onRemove = { removing = content }
                     )
                 }
             }
         }
+    }
+
+    declining?.let { item ->
+        AlertDialog(
+            onDismissRequest = { declining = null },
+            title = { Text("Decline this upload?") },
+            text = {
+                Column {
+                    Text(
+                        text = "Tell ${item.teacherName.ifBlank { "the teacher" }} why. " +
+                                "They will read this reason in their app. Students will not see the upload.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = declineText,
+                        onValueChange = {
+                            declineText = it
+                            declineError = null
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Reason") },
+                        minLines = 3,
+                        isError = declineError != null,
+                        supportingText = { declineError?.let { Text(it) } }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.declineContent(item, declineText) { error ->
+                        if (error == null) {
+                            declining = null
+                            declineText = ""
+                        } else {
+                            declineError = error
+                        }
+                    }
+                }) {
+                    Text("Decline", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = { declining = null }) { Text("Cancel") } }
+        )
     }
 
     removing?.let { item ->
@@ -359,9 +468,12 @@ fun TeacherUploadsSection(state: AdminUiState, viewModel: AdminViewModel) {
     }
 }
 
-/** One teacher in the list: name, email and what they uploaded. [newCount] > 0 shows a red badge. */
+/**
+ * One teacher in the list: name, email and what they uploaded.
+ * [pendingCount] > 0 shows an amber "pending" badge (needs a decision), otherwise [newCount] > 0 a red "new" badge.
+ */
 @Composable
-private fun TeacherRow(group: TeacherGroup, newCount: Int, onClick: () -> Unit) {
+private fun TeacherRow(group: TeacherGroup, newCount: Int, pendingCount: Int, onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -375,12 +487,18 @@ private fun TeacherRow(group: TeacherGroup, newCount: Int, onClick: () -> Unit) 
                 .fillMaxWidth()
                 .height(IntrinsicSize.Min)
         ) {
-            // red edge = something new, teal edge = all seen
+            // amber edge = waiting for a decision, red = something new, teal = all seen
             Box(
                 modifier = Modifier
                     .width(5.dp)
                     .fillMaxHeight()
-                    .background(if (newCount > 0) NewRed else NenaSecondary)
+                    .background(
+                        when {
+                            pendingCount > 0 -> PendingAmber
+                            newCount > 0 -> NewRed
+                            else -> NenaSecondary
+                        }
+                    )
             )
             Row(
                 modifier = Modifier.padding(14.dp),
@@ -431,7 +549,10 @@ private fun TeacherRow(group: TeacherGroup, newCount: Int, onClick: () -> Unit) 
 
                 Spacer(modifier = Modifier.width(8.dp))
                 Column(horizontalAlignment = Alignment.End) {
-                    if (newCount > 0) {
+                    if (pendingCount > 0) {
+                        IconPill("$pendingCount pending", NenaAccentContainer, AmberText)
+                        Spacer(modifier = Modifier.height(6.dp))
+                    } else if (newCount > 0) {
                         // only while there is something the admin has not looked at
                         IconPill("$newCount new", NewRedSoft, NewRedText)
                         Spacer(modifier = Modifier.height(6.dp))
@@ -453,6 +574,8 @@ private fun UploadCard(
     isNew: Boolean,
     onOpen: () -> Unit,
     onOpenAnswer: () -> Unit,
+    onApprove: () -> Unit,
+    onDecline: () -> Unit,
     onRemove: () -> Unit
 ) {
     val style = content.type.style()
@@ -516,6 +639,11 @@ private fun UploadCard(
                     } else {
                         IconPill("Free", NenaSecondaryContainer, TealText)
                     }
+                    when (content.status) {
+                        ContentStatus.PENDING -> IconPill("Pending", NenaAccentContainer, AmberText)
+                        ContentStatus.APPROVED -> IconPill("Live", Color(0xFFDFF3E1), Color(0xFF2E7D32), Icons.Filled.CheckCircle)
+                        ContentStatus.DECLINED -> IconPill("Declined", NewRedSoft, NewRedText)
+                    }
                 }
 
                 if (content.description.isNotBlank()) {
@@ -527,6 +655,23 @@ private fun UploadCard(
                         maxLines = 5,
                         overflow = TextOverflow.Ellipsis
                     )
+                }
+
+                // the reason the admin gave when declining
+                if (content.status == ContentStatus.DECLINED) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = Color(0xFFFFDAD6),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "Declined: " + content.declineReason.ifBlank { "No reason was given." },
+                            modifier = Modifier.padding(10.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF410002)
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -558,6 +703,32 @@ private fun UploadCard(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+
+                // A student-turned-teacher's upload waits for the admin's decision
+                if (content.status == ContentStatus.PENDING) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = onApprove,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Approve")
+                        }
+                        OutlinedButton(
+                            onClick = onDecline,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text("Decline", color = MaterialTheme.colorScheme.error)
+                        }
                     }
                 }
             }

@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -53,14 +56,46 @@ class TeacherListViewModel(
         viewModelScope.launch {
             try {
                 val uid = FirebaseAuth.getInstance().currentUser?.uid
-                // A student who is also a teacher should not see themselves in the list
-                // Only teachers who have uploaded materials are listed
-                val counts = contentRepository.getVisibleContents()
-                    .groupingBy { it.teacherId }
-                    .eachCount()
-                val teachers = teacherRepository.getAllTeachers()
-                    .filter { it.uid != uid && (counts[it.uid] ?: 0) > 0 }
-                val paid = if (uid != null) paymentRepository.getPaidTeacherIds(uid) else emptySet()
+
+                // The list is built from the materials themselves: a teacher is listed when he or she
+                // has at least one live upload. Each teacher's profile is then read one by one, so a
+                // teacher is found whatever role the account has open right now (an account that is
+                // both student and teacher included).
+                val contents = contentRepository.getVisibleContents()
+                val counts = contents.groupingBy { it.teacherId }.eachCount()
+                val teachers = coroutineScope {
+                    contents.groupBy { it.teacherId }
+                        .filterKeys { it.isNotBlank() }
+                        .map { (teacherId, items) ->
+                            async {
+                                val profile = teacherRepository.getProfile(
+                                    teacherId,
+                                    items.first().teacherName,
+                                    ""
+                                )
+                                // the subjects of the materials count as the teacher's subjects too
+                                val subjects = profile.subjectIds
+                                    .mapIndexed { i, id -> id to (profile.subjectNames.getOrNull(i) ?: id) }
+                                    .plus(
+                                        items.filter { it.subjectId.isNotBlank() }
+                                            .map { it.subjectId to it.subjectName }
+                                    )
+                                    .distinctBy { it.first }
+                                profile.copy(
+                                    name = profile.name.ifBlank { items.first().teacherName },
+                                    subjectIds = subjects.map { it.first },
+                                    subjectNames = subjects.map { it.second }
+                                )
+                            }
+                        }
+                        .awaitAll()
+                }
+                // A student who is also a teacher can open their own materials without paying
+                val paid = if (uid != null) {
+                    paymentRepository.getPaidTeacherIds(uid) + uid
+                } else {
+                    emptySet()
+                }
                 _state.update {
                     it.copy(
                         loading = false,

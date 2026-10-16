@@ -46,6 +46,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,6 +71,7 @@ import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.util.YouTubeLinks
 
 private val AmberText = Color(0xFF6B4A00)
 private val TealText = Color(0xFF004D40)
@@ -86,6 +90,8 @@ fun TeacherMaterialsScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // the video the student is watching right now (null = player closed)
+    var playing by remember { mutableStateOf<TeacherContent?>(null) }
 
     LaunchedEffect(teacherId) { viewModel.load(teacherId) }
 
@@ -222,7 +228,16 @@ fun TeacherMaterialsScreen(
                             unlocked = state.isUnlocked(item),
                             feeLabel = formatFee(teacher.fee),
                             onPay = onPay,
-                            onOpen = { FileActions.openFile(context, item.openUrl, item.title) },
+                            onOpen = {
+                                // a YouTube link plays inside the app; anything else opens as before
+                                val isYoutube = item.type == ContentType.VIDEO_LINK &&
+                                        YouTubeLinks.extractId(item.openUrl) != null
+                                if (isYoutube) {
+                                    playing = item
+                                } else {
+                                    FileActions.openFile(context, item.openUrl, item.title)
+                                }
+                            },
                             onOpenAnswer = {
                                 FileActions.openFile(context, item.answerFileUrl, item.title)
                             },
@@ -232,6 +247,15 @@ fun TeacherMaterialsScreen(
                 }
             }
         }
+    }
+
+    playing?.let { video ->
+        VideoPlayerDialog(
+            title = video.title,
+            description = video.description,
+            videoUrl = video.openUrl,
+            onClose = { playing = null }
+        )
     }
 }
 

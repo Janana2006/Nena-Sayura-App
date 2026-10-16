@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.model.TeacherProfile
@@ -137,7 +138,7 @@ class TeacherViewModel(
         }
         viewModelScope.launch {
             try {
-                contentRepository.update(content.id, title, description, access)
+                val newStatus = contentRepository.update(content, title, description, access)
                 _state.update {
                     it.copy(
                         contents = it.contents.map { c ->
@@ -145,11 +146,17 @@ class TeacherViewModel(
                                 c.copy(
                                     title = title.trim(),
                                     description = description.trim(),
-                                    access = access
+                                    access = access,
+                                    status = newStatus,
+                                    declineReason = ""
                                 )
                             } else c
                         },
-                        message = "Changes saved. Students can see them now."
+                        message = if (newStatus == ContentStatus.PENDING) {
+                            "Changes saved. Sent to the admin for approval again."
+                        } else {
+                            "Changes saved. Students can see them now."
+                        }
                     )
                 }
             } catch (e: CancellationException) {

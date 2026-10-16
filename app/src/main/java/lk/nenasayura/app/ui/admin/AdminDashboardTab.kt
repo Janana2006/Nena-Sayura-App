@@ -59,11 +59,11 @@ fun AdminDashboardTab(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // teacher uploads the admin has not looked at yet (shown in the banner below)
+    // pending uploads + uploads the admin has not looked at yet (shown in the banner below)
     val context = LocalContext.current
     UploadSeenStore.init(context)
     val seenUploads by UploadSeenStore.seen.collectAsStateWithLifecycle()
-    val newUploads = UploadSeenStore.newCount(state.teacherContents, seenUploads)
+    val newUploads = UploadSeenStore.attentionCount(state.teacherContents, seenUploads)
 
     Column(
         modifier = modifier
@@ -157,14 +157,18 @@ fun AdminDashboardTab(
                         )
                         Column(modifier = Modifier.padding(start = 14.dp)) {
                             Text(
-                                text = "$newUploads new teacher upload" +
-                                        (if (newUploads == 1) "" else "s"),
+                                text = if (state.pendingCount > 0) {
+                                    "${state.pendingCount} upload" +
+                                            (if (state.pendingCount == 1) "" else "s") + " waiting for approval"
+                                } else {
+                                    "$newUploads new teacher upload" + (if (newUploads == 1) "" else "s")
+                                },
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF3B2A00)
                             )
                             Text(
-                                text = "Tap to view or remove",
+                                text = "Tap to review",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF6B4A00)
                             )
