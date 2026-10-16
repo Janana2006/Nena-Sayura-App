@@ -407,12 +407,30 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         // Student-only screens: each is replaced by a real screen in its own task
         // My teacher: 1) teacher list (free first, then paid)
         composable(Routes.TEACHERS) {
-            TeacherListScreen(
-                onBack = { navController.popBackStack() },
-                onOpenTeacher = { teacherId ->
-                    navController.navigate(Routes.teacherMaterialsRoute(teacherId))
+            val openTeacher: (String) -> Unit = { teacherId ->
+                navController.navigate(Routes.teacherMaterialsRoute(teacherId))
+            }
+            if (session.isStudent) {
+                // Students: the stream + subjects chosen at sign-up decide which teachers are shown
+                StudentStudyGate(
+                    title = "My teacher",
+                    onBack = { navController.popBackStack() },
+                    onChange = { navController.navigate(Routes.STUDY_EDIT) }
+                ) {
+                    val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                    TeacherListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTeacher = openTeacher,
+                        selection = browse,
+                        onChangeSelection = { navController.navigate(Routes.STUDY_EDIT) }
+                    )
                 }
-            )
+            } else {
+                TeacherListScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTeacher = openTeacher
+                )
+            }
         }
         // 2) the chosen teacher's materials (paid teacher: fee + Pay button)
         composable(
