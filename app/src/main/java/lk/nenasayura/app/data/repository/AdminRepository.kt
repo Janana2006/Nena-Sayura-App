@@ -53,7 +53,7 @@ class AdminRepository(
                     email = doc.getString("email") ?: "",
                     role = doc.getString("role") ?: "student",
                     isFree = doc.getBoolean("isFree") ?: true,
-                    fee = (doc.getLong("fee") ?: 0L).toInt(),
+                    fee = (doc.get("fee") as? Number)?.toInt() ?: 0,
                     streamName = doc.getString("streamName") ?: "",
                     subjectNames = (doc.get("subjectNames") as? List<*>)
                         ?.filterIsInstance<String>() ?: emptyList(),

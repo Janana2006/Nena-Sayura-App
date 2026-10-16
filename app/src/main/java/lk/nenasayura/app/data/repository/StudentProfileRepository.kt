@@ -59,7 +59,7 @@ class StudentProfileRepository(
             phone = doc.getString("phone") ?: "",
             school = doc.getString("school") ?: "",
             district = doc.getString("district") ?: "",
-            examYear = (doc.getLong("examYear") ?: 0L).toInt(),
+            examYear = (doc.get("examYear") as? Number)?.toInt() ?: 0,
             streamId = (study?.get("streamId") ?: doc.getString("streamId")) as? String ?: "",
             streamName = (study?.get("streamName") ?: doc.getString("streamName")) as? String ?: "",
             subjectIds = stringList("subjectIds"),
