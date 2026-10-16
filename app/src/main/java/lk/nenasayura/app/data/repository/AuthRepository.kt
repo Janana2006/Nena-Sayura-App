@@ -54,6 +54,7 @@ class AuthRepository(
 
                 val subjectIds = (doc.get("subjectIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
                 val subjectNames = (doc.get("subjectNames") as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                val feeNumber = (doc.get("fee") as? Number)?.toInt() ?: 0
 
                 onResult(
                     Result.success(
@@ -63,7 +64,7 @@ class AuthRepository(
                             email = doc.getString("email") ?: fbUser.email ?: "",
                             role = doc.getString("role") ?: "student",
                             isFree = doc.getBoolean("isFree") ?: true,
-                            fee = (doc.getLong("fee") ?: 0L).toInt(),
+                            fee = feeNumber,
                             setupDone = doc.getBoolean("setupDone") ?: true,
                             streamId = doc.getString("streamId") ?: "",
                             streamName = doc.getString("streamName") ?: "",

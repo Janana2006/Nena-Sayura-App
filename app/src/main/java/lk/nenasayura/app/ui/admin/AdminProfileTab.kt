@@ -135,7 +135,7 @@ fun AdminProfileTab(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(NenaBackground)
+            .background(MaterialTheme.colorScheme.background)
             .verticalScroll(rememberScrollState())
     ) {
         // ---------------- Header + floating stats ----------------
@@ -257,7 +257,7 @@ fun AdminProfileTab(
                                 text = value,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = NenaPrimary
+                                color = MaterialTheme.colorScheme.primary
                             )
                             Text(
                                 text = label,
@@ -280,7 +280,7 @@ fun AdminProfileTab(
             // ---------------- Display name (tap the pencil to edit) ----------------
             AdminCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(Icons.Filled.Badge, NenaPrimary, NenaPrimaryContainer)
+                    IconBubble(Icons.Filled.Badge, MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.primaryContainer)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
@@ -299,7 +299,7 @@ fun AdminProfileTab(
                             draftName = profileState.name
                             editingName = true
                         }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "Edit name", tint = NenaPrimary)
+                            Icon(Icons.Filled.Edit, contentDescription = "Edit name", tint = MaterialTheme.colorScheme.primary)
                         }
                     }
                 }
@@ -355,7 +355,7 @@ fun AdminProfileTab(
             // ---------------- What this admin can open ----------------
             AdminCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconBubble(Icons.Filled.Key, NenaSecondary, NenaSecondaryContainer)
+                    IconBubble(Icons.Filled.Key, MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.secondaryContainer)
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
                         Text(
@@ -399,8 +399,8 @@ fun AdminProfileTab(
                     } else {
                         "You sign in with Google. Change it in your Google account."
                     },
-                    tint = NenaSecondary,
-                    container = NenaSecondaryContainer,
+                    tint = MaterialTheme.colorScheme.secondary,
+                    container = MaterialTheme.colorScheme.secondaryContainer,
                     enabled = profileState.hasPasswordLogin && !profileState.busy,
                     onClick = {
                         changingEmail = !changingEmail
@@ -423,7 +423,7 @@ fun AdminProfileTab(
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 6.dp),
-                    color = Color(0xFFF1F5F9)
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
                 ActionRow(
                     icon = Icons.Filled.Lock,
@@ -433,8 +433,8 @@ fun AdminProfileTab(
                     } else {
                         "You sign in with Google. Change it in your Google account."
                     },
-                    tint = NenaPrimary,
-                    container = NenaPrimaryContainer,
+                    tint = MaterialTheme.colorScheme.primary,
+                    container = MaterialTheme.colorScheme.primaryContainer,
                     enabled = profileState.hasPasswordLogin && !profileState.busy,
                     onClick = {
                         changingPassword = !changingPassword
@@ -456,7 +456,7 @@ fun AdminProfileTab(
                 }
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 6.dp),
-                    color = Color(0xFFF1F5F9)
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
                 ActionRow(
                     icon = Icons.AutoMirrored.Filled.Logout,
@@ -597,7 +597,7 @@ private fun IconBubble(icon: ImageVector, tint: Color, container: Color) {
 
 @Composable
 private fun AccessChip(label: String) {
-    Surface(shape = RoundedCornerShape(50), color = NenaSecondaryContainer) {
+    Surface(shape = RoundedCornerShape(50), color = MaterialTheme.colorScheme.secondaryContainer) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -605,7 +605,7 @@ private fun AccessChip(label: String) {
             Icon(
                 Icons.Filled.Check,
                 contentDescription = null,
-                tint = NenaSecondary,
+                tint = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.size(14.dp)
             )
             Spacer(modifier = Modifier.width(6.dp))
@@ -613,7 +613,7 @@ private fun AccessChip(label: String) {
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = NenaSecondary
+                color = MaterialTheme.colorScheme.secondary
             )
         }
     }
