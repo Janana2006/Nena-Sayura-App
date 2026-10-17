@@ -1,6 +1,29 @@
 package lk.nenasayura.app.ui.common
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.VolunteerActivism
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.sp
+import lk.nenasayura.app.ui.theme.NenaBackground
+import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
+import lk.nenasayura.app.ui.theme.NenaSecondary
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -249,61 +272,202 @@ private fun BecomeRoleFlow(
     var feeError by remember { mutableStateOf<String?>(null) }
 
     if (!serviceChosen) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Spacer(modifier = Modifier.height(24.dp))
-            Text(
-                text = "Become a teacher",
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = NenaPrimary
-            )
-            Text(
-                text = "Your student account stays as it is. Choose how your teaching service works.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        Column(modifier = Modifier.fillMaxSize().background(NenaBackground)) {
 
-            Text("Your service", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = isFree, onClick = { isFree = true }, label = { Text("Free") })
-                FilterChip(selected = !isFree, onClick = { isFree = false }, label = { Text("Paid") })
-            }
-
-            if (!isFree) {
-                OutlinedTextField(
-                    value = feeText,
-                    onValueChange = { feeText = it.filter { c -> c.isDigit() }; feeError = null },
-                    label = { Text("Fee amount") },
-                    prefix = { Text("Rs. ") },
-                    singleLine = true,
-                    isError = feeError != null,
-                    supportingText = feeError?.let { { Text(it) } },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    if (!isFree && (feeText.toIntOrNull() ?: 0) <= 0) {
-                        feeError = "Enter a valid fee amount"
-                    } else {
-                        serviceChosen = true
-                    }
-                },
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            ) { Text("Continue") }
-            TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-                Text("Cancel")
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // ================= Header (SetupScreen eke wage) =================
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                        .background(Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 60.dp, y = (-50).dp)
+                            .size(180.dp)
+                            .background(Color.White.copy(alpha = 0.07f), CircleShape)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .offset(x = (-50).dp, y = 40.dp)
+                            .size(140.dp)
+                            .background(Color.White.copy(alpha = 0.06f), CircleShape)
+                    )
+
+                    Column(
+                        modifier = Modifier
+                            .statusBarsPadding()
+                            .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 28.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(64.dp)
+                                    .background(Color.White.copy(alpha = 0.18f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(46.dp).background(Color.White, CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Person,
+                                        contentDescription = null,
+                                        tint = NenaPrimary,
+                                        modifier = Modifier.size(26.dp)
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column {
+                                Text(
+                                    text = "Become a teacher",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Choose how your teaching service works",
+                                    fontSize = 13.sp,
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Text(
+                            text = "Your student account stays as it is.",
+                            fontSize = 12.sp,
+                            color = Color.White,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
+                                .padding(14.dp)
+                        )
+                    }
+                }
+
+                // ================= Content =================
+                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                    Spacer(modifier = Modifier.height(22.dp))
+
+                    Text(
+                        "Your service",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = RoleInkText
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        "Tap how you want to offer your teaching",
+                        fontSize = 13.sp,
+                        color = RoleGreyText
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    ServiceOptionCard(
+                        title = "Free",
+                        description = "Share notes and resources with students at no cost",
+                        icon = Icons.Default.VolunteerActivism,
+                        selected = isFree,
+                        onClick = { isFree = true; feeError = null }
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    ServiceOptionCard(
+                        title = "Paid",
+                        description = "Set a fee for students who use your service",
+                        icon = Icons.Default.Payments,
+                        selected = !isFree,
+                        onClick = { isFree = false }
+                    )
+
+                    if (!isFree) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(22.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.White),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    "Fee amount",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = RoleInkText
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                OutlinedTextField(
+                                    value = feeText,
+                                    onValueChange = {
+                                        feeText = it.filter { c -> c.isDigit() }
+                                        feeError = null
+                                    },
+                                    label = { Text("Fee amount") },
+                                    prefix = { Text("Rs. ") },
+                                    singleLine = true,
+                                    isError = feeError != null,
+                                    supportingText = feeError?.let { { Text(it) } },
+                                    shape = RoundedCornerShape(16.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = NenaPrimary,
+                                        focusedLabelColor = NenaPrimary,
+                                        cursorColor = NenaPrimary
+                                    ),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            // ================= Bottom bar (SetupScreen eke wage) =================
+            Surface(color = Color.White, shadowElevation = 16.dp) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Button(
+                        onClick = {
+                            if (!isFree && (feeText.toIntOrNull() ?: 0) <= 0) {
+                                feeError = "Enter a valid fee amount"
+                            } else {
+                                serviceChosen = true
+                            }
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = NenaPrimary,
+                            contentColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(54.dp)
+                    ) {
+                        Text("Continue", fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    TextButton(onClick = onCancel) {
+                        Text(
+                            text = "Cancel",
+                            color = RoleGreyText,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp
+                        )
+                    }
+                }
             }
         }
     } else {
@@ -320,5 +484,66 @@ private fun BecomeRoleFlow(
             bottomButtonLabel = "Cancel",
             blockBack = false
         )
+    }
+}
+
+private val RoleInkText = Color(0xFF1B1B1F)
+private val RoleGreyText = Color(0xFF6B7280)
+
+/** Selectable card (Free / Paid) - same look as the stream cards in SetupScreen. */
+@Composable
+private fun ServiceOptionCard(
+    title: String,
+    description: String,
+    icon: ImageVector,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor by animateColorAsState(
+        if (selected) NenaPrimary else Color(0xFFE3E6EF), label = "serviceBorder"
+    )
+    val bg by animateColorAsState(
+        if (selected) NenaPrimaryContainer else Color.White, label = "serviceBg"
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(bg)
+            .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(
+                    if (selected) Brush.linearGradient(listOf(NenaPrimary, NenaSecondary))
+                    else Brush.linearGradient(listOf(NenaPrimaryContainer, NenaPrimaryContainer)),
+                    RoundedCornerShape(16.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                icon,
+                contentDescription = null,
+                tint = if (selected) Color.White else NenaPrimary
+            )
+        }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) NenaPrimary else RoleInkText
+            )
+            Text(text = description, fontSize = 12.sp, color = RoleGreyText)
+        }
+        if (selected) {
+            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NenaSecondary)
+        }
     }
 }

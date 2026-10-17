@@ -11,10 +11,21 @@ class SubjectRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
+    // All stream documents, sorted by "order" here in the app.
+    // NOTE: a Firestore orderBy on "order" silently drops every document that has no "order"
+    // field (for example a stream added by hand in the Firebase console), so we read all
+    // documents and sort them ourselves. Streams without "order" go to the end.
+    private suspend fun loadStreamDocuments(): List<DocumentSnapshot> =
+        db.collection(COLLECTION).get().await().documents.sortedWith(
+            compareBy<DocumentSnapshot>(
+                { (it.get("order") as? Number)?.toDouble() ?: Double.MAX_VALUE },
+                { (it.getString("name") ?: it.id).lowercase() }
+            )
+        )
+
     // Okkoma subjects (Physics wage stream 2kakama thiyena ewa ekak witharai)
     suspend fun getSubjects(): List<Subject> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
-        return snapshot.documents
+        return loadStreamDocuments()
             .flatMap { doc -> parseSubjects(doc.get("subjects"), doc.id) }
             .distinctBy { it.id }
             .sortedBy { it.name }
@@ -28,8 +39,7 @@ class SubjectRepository(
 
     // Okkoma streams (Maths Stream, Bio Stream ...) - subjects ekka
     suspend fun getStreams(): List<StudyStream> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
-        return snapshot.documents.map { it.toStream() }
+        return loadStreamDocuments().map { it.toStream() }
     }
 
     // Stream ekak (id eken). Nathnam null
@@ -38,11 +48,29 @@ class SubjectRepository(
         return if (doc.exists()) doc.toStream() else null
     }
 
-    private fun DocumentSnapshot.toStream(): StudyStream = StudyStream(
-        id = id,
-        name = getString("name") ?: id,
-        subjects = parseSubjects(get("subjects"), id).sortedBy { it.name }
-    )
+    private fun DocumentSnapshot.toStream(): StudyStream {
+        val subjects = parseSubjects(get("subjects"), id).sortedBy { it.name }
+        return StudyStream(
+            id = id,
+            name = getString("name") ?: id,
+            subjects = subjects,
+            groups = parseGroups(get("groups"), subjects)
+        )
+    }
+
+    // "groups" in Firestore = one text per group, "|" between the options:
+    //   ["combined_maths", "physics", "chemistry|ict"]  ->  Group 1, Group 2, Group 3
+    // Empty groups are kept so Group 1/2/3 keep their position.
+    private fun parseGroups(raw: Any?, subjects: List<Subject>): List<List<Subject>> {
+        val byId = subjects.associateBy { it.id }
+        return (raw as? List<*>)?.map { item ->
+            (item as? String).orEmpty()
+                .split("|")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .mapNotNull { id -> byId[id] }
+        } ?: emptyList()
+    }
 
     // subjects format 2kama handle karanawa
     // If the real field names differ, change them here only.

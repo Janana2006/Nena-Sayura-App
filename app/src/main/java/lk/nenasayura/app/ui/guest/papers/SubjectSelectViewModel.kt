@@ -11,7 +11,19 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.data.model.StudyStream
+import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.SubjectRepository
+
+/** Streams without groups: an A/L student studies 3 subjects, so at most 3 can be chosen. */
+const val MAX_SUBJECTS = 3
+
+/**
+ * One group of a stream (Group 1, Group 2 ...).
+ * One subject alone = compulsory. Two or more = the student chooses ONE of them.
+ */
+data class SubjectGroup(val number: Int, val subjects: List<Subject>) {
+    val isCompulsory: Boolean get() = subjects.size == 1
+}
 
 data class SubjectSelectUiState(
     val isLoading: Boolean = true,
@@ -19,12 +31,26 @@ data class SubjectSelectUiState(
     val stream: StudyStream? = null,
     val selectedIds: Set<String> = emptySet()
 ) {
-    val allSelected: Boolean
-        get() = stream != null && stream.subjects.isNotEmpty() &&
-                selectedIds.size == stream.subjects.size
+    // Group 1, 2, 3 ... (an empty group is skipped but the others keep their number)
+    val groups: List<SubjectGroup>
+        get() = stream?.groups.orEmpty()
+            .mapIndexed { index, subjects -> SubjectGroup(index + 1, subjects) }
+            .filter { it.subjects.isNotEmpty() }
+
+    val hasGroups: Boolean get() = groups.isNotEmpty()
+
+    // With groups: one subject per group. Without groups: up to 3 subjects.
+    val maxSubjects: Int get() = if (hasGroups) groups.size else MAX_SUBJECTS
+
+    // Without groups: when 3 are ticked the others are locked until one is unticked
+    val isFull: Boolean get() = !hasGroups && selectedIds.size >= MAX_SUBJECTS
+
+    val canContinue: Boolean
+        get() = if (hasGroups) groups.all { group -> group.subjects.any { it.id in selectedIds } }
+        else selectedIds.isNotEmpty()
 }
 
-/** Loads the subjects of one stream and keeps the student's (temporary) choice. */
+/** Loads the subjects of one stream and keeps the (temporary) choice. */
 class SubjectSelectViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     // Navigation argument
@@ -50,12 +76,23 @@ class SubjectSelectViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     }
                     return@launch
                 }
-                // If the student comes back to the same stream, keep the earlier ticks
+
+                // If the user comes back to the same stream, keep the earlier ticks
                 val previous = PaperBrowseSelection.state.value
-                val validIds = stream.subjects.map { it.id }.toSet()
-                val preselected =
-                    if (previous.streamId == stream.id) previous.subjectIds intersect validIds
-                    else emptySet()
+                val earlier = if (previous.streamId == stream.id) previous.subjectIds else emptySet()
+                val draft = SubjectSelectUiState(stream = stream)
+
+                val preselected: Set<String> = if (draft.hasGroups) {
+                    // Compulsory subjects are always ticked, the others come back as before
+                    draft.groups.mapNotNull { group ->
+                        if (group.isCompulsory) group.subjects.first().id
+                        else group.subjects.firstOrNull { it.id in earlier }?.id
+                    }.toSet()
+                } else {
+                    val validIds = stream.subjects.map { it.id }.toSet()
+                    (earlier intersect validIds).take(MAX_SUBJECTS).toSet()
+                }
+
                 _uiState.update {
                     it.copy(isLoading = false, stream = stream, selectedIds = preselected)
                 }
@@ -72,21 +109,38 @@ class SubjectSelectViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
         }
     }
 
-    fun toggle(subjectId: String) = _uiState.update {
-        val next = if (subjectId in it.selectedIds) it.selectedIds - subjectId else it.selectedIds + subjectId
-        it.copy(selectedIds = next)
+    fun toggle(subjectId: String) = _uiState.update { state ->
+        val current = state.selectedIds
+        val next = if (state.hasGroups) {
+            val group = state.groups.firstOrNull { g -> g.subjects.any { it.id == subjectId } }
+            when {
+                group == null -> current
+                group.isCompulsory -> current                       // compulsory: cannot be changed
+                subjectId in current -> current - subjectId         // untick
+                else -> (current - group.subjects.map { it.id }.toSet()) + subjectId  // one per group
+            }
+        } else {
+            when {
+                subjectId in current -> current - subjectId
+                current.size < MAX_SUBJECTS -> current + subjectId
+                else -> current
+            }
+        }
+        state.copy(selectedIds = next)
     }
 
-    fun toggleAll() = _uiState.update {
-        val all = it.stream?.subjects?.map { s -> s.id }?.toSet() ?: emptySet()
-        it.copy(selectedIds = if (it.allSelected) emptySet() else all)
-    }
-
-    /** Saves the choice in memory only. Returns false if nothing is selected. */
+    /** Saves the choice in memory only. Returns false if the choice is not complete yet. */
     fun confirm(): Boolean {
         val state = _uiState.value
         val stream = state.stream ?: return false
-        val chosen = stream.subjects.filter { it.id in state.selectedIds }
+        if (!state.canContinue) return false
+
+        // Group 1, 2, 3 order when the stream has groups
+        val chosen = if (state.hasGroups) {
+            state.groups.mapNotNull { group -> group.subjects.firstOrNull { it.id in state.selectedIds } }
+        } else {
+            stream.subjects.filter { it.id in state.selectedIds }
+        }
         if (chosen.isEmpty()) return false
         PaperBrowseSelection.select(stream, chosen)
         return true

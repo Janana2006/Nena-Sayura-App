@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.School
@@ -39,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import lk.nenasayura.app.ui.theme.NenaAccent
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.IconPalette
@@ -68,6 +70,42 @@ fun StudentStudyTab(actions: StudentHomeActions, modifier: Modifier = Modifier) 
     }
 }
 
+/**
+ * Guest version of the Resources tab: same cards as the student, all open
+ * (papers, marking schemes, quizzes, guide books and search are free for guests).
+ */
+@Composable
+fun GuestResourcesTab(
+    onOpenPapers: () -> Unit,
+    onOpenMarkingSchemes: () -> Unit,
+    onOpenQuizzes: () -> Unit,
+    onOpenGuideBooks: () -> Unit,
+    onOpenSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    MenuTab(modifier = modifier) {
+        MenuItemCard("Papers", "Past, model, provincial and target papers", Icons.Filled.Description, onOpenPapers, palette = NenaIconColors.Papers)
+        MenuItemCard("Marking Schemes", "Check your answers step by step", Icons.Filled.FactCheck, onOpenMarkingSchemes, palette = NenaIconColors.MarkingSchemes)
+        MenuItemCard("Quizzes", "Practice MCQs with explanations", Icons.Filled.Quiz, onOpenQuizzes, palette = NenaIconColors.Quizzes)
+        MenuItemCard("Guide Books", "Teacher guides and study books", Icons.AutoMirrored.Filled.MenuBook, onOpenGuideBooks, palette = NenaIconColors.GuideBooks)
+        MenuItemCard("Search", "Find any subject or resource", Icons.Filled.Search, onOpenSearch, palette = NenaIconColors.Progress)
+    }
+}
+
+/**
+ * Guest version of the Study tab: same cards as the student, but locked.
+ * Tapping any card sends the guest to the login page ([onLogin]).
+ */
+@Composable
+fun GuestStudyTab(onLogin: () -> Unit, modifier: Modifier = Modifier) {
+    MenuTab(modifier = modifier) {
+        MenuItemCard("Teachers", "Choose a teacher and see their notes and videos", Icons.Filled.School, onLogin, palette = NenaIconColors.Teacher, locked = true)
+        MenuItemCard("Timetable", "Your weekly classes and study times", Icons.Filled.CalendarMonth, onLogin, palette = NenaIconColors.Timetable, locked = true)
+        MenuItemCard("Reminders", "Study, exam and revision reminders", Icons.Filled.Notifications, onLogin, palette = NenaIconColors.Reminders, locked = true)
+        MenuItemCard("Study Analytics", "Track your quiz results and progress", Icons.Filled.BarChart, onLogin, palette = NenaIconColors.Progress, locked = true)
+    }
+}
+
 @Composable
 private fun MenuTab(
     modifier: Modifier,
@@ -92,7 +130,8 @@ fun MenuItemCard(
     icon: ImageVector,
     onClick: () -> Unit,
     palette: IconPalette = IconPalette(NenaPrimary, NenaPrimaryContainer),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    locked: Boolean = false
 ) {
     Card(
         onClick = onClick,
@@ -126,11 +165,21 @@ fun MenuItemCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (locked) {
+                // Guests: lock icon instead of the arrow (card still opens the login page)
+                Icon(
+                    imageVector = Icons.Filled.Lock,
+                    contentDescription = "Login required",
+                    tint = NenaAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
     }
 }

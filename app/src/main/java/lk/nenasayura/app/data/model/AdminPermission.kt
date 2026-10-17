@@ -12,7 +12,7 @@ enum class AdminPermission(val key: String, val label: String, val hint: String)
     GUIDE_BOOKS("guide_books", "Guide Books", "Add and delete guide books"),
     QUIZZES("quizzes", "Quizzes", "Quizzes section"),
     TEACHER_UPLOADS("teacher_uploads", "Teacher Uploads", "Review, approve or decline teacher uploads"),
-    STREAMS("streams", "Streams & Subjects", "Add streams, subjects and kandas"),
+    STREAMS("streams", "Streams & Subjects", "Add streams, subjects and groups"),
     STAFF("staff", "Manage Staff", "See staff and add new staff members");
 
     companion object {

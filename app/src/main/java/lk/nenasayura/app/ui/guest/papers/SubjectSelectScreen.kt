@@ -1,39 +1,63 @@
 package lk.nenasayura.app.ui.student.papers
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.ErrorView
+import lk.nenasayura.app.ui.common.HeroBanner
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaIconColors
+import lk.nenasayura.app.ui.theme.NenaPrimary
 
-/** Step 2 of Papers (students): tick the subjects of the chosen stream, then Continue. */
+private val subjectPalettes = listOf(
+    NenaIconColors.Papers,
+    NenaIconColors.MarkingSchemes,
+    NenaIconColors.ResourceBooks,
+    NenaIconColors.Quizzes,
+    NenaIconColors.Timetable
+)
+
+/** Step 2 (Papers / Marking Schemes): subjects in Group 1, 2, 3 (one from each group), then Continue. */
 @Composable
 fun SubjectSelectScreen(
     onBack: () -> Unit,
@@ -54,14 +78,17 @@ fun SubjectSelectScreen(
                 Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
                     Button(
                         onClick = { if (viewModel.confirm()) onDone() },
-                        enabled = state.selectedIds.isNotEmpty(),
+                        enabled = state.canContinue,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
                         Text(
-                            if (state.selectedIds.isEmpty()) "Select at least one subject"
-                            else "Continue (${state.selectedIds.size} selected)"
+                            when {
+                                state.canContinue -> "Continue (${state.selectedIds.size} selected)"
+                                state.hasGroups -> "Choose one subject from each group"
+                                else -> "Select at least one subject"
+                            }
                         )
                     }
                 }
@@ -85,59 +112,187 @@ fun SubjectSelectScreen(
                     EmptyView(message = "No subjects are available for this stream yet.")
 
                 else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     item {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                        HeroBanner(
+                            title = "Choose your subjects",
+                            subtitle = hint,
+                            icon = Icons.AutoMirrored.Filled.MenuBook
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // One dot per allowed subject: filled = chosen
+                                repeat(state.maxSubjects) { index ->
+                                    Box(
+                                        modifier = Modifier
+                                            .size(12.dp)
+                                            .background(
+                                                if (index < state.selectedIds.size) Color.White
+                                                else Color.White.copy(alpha = 0.30f),
+                                                CircleShape
+                                            )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = "Choose your subjects",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = hint,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            TextButton(onClick = viewModel::toggleAll) {
-                                Text(if (state.allSelected) "Clear" else "Select all")
-                            }
-                        }
-                    }
-                    items(stream.subjects, key = { it.id }) { subject ->
-                        val checked = subject.id in state.selectedIds
-                        Card(
-                            onClick = { viewModel.toggle(subject.id) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (checked) MaterialTheme.colorScheme.primaryContainer
-                                else MaterialTheme.colorScheme.surface
-                            ),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = checked,
-                                    onCheckedChange = { viewModel.toggle(subject.id) }
-                                )
-                                Text(
-                                    text = subject.name,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold
+                                    text = if (state.isFull) "3 of 3 selected - untick one to change"
+                                    else "${state.selectedIds.size} of ${state.maxSubjects} selected",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = Color.White
                                 )
                             }
                         }
                     }
+
+                    if (state.hasGroups) {
+                        // Group 1, Group 2, Group 3 ... (choose one subject in each)
+                        state.groups.forEach { group ->
+                            item(key = "header_${group.number}") {
+                                GroupHeader(group)
+                            }
+                            items(group.subjects, key = { subject -> "${group.number}_${subject.id}" }) { subject ->
+                                val index = stream.subjects.indexOfFirst { it.id == subject.id }.coerceAtLeast(0)
+                                SubjectChoiceCard(
+                                    name = subject.name,
+                                    checked = subject.id in state.selectedIds,
+                                    enabled = true,
+                                    compulsory = group.isCompulsory,
+                                    palette = subjectPalettes[index % subjectPalettes.size],
+                                    onClick = { viewModel.toggle(subject.id) }
+                                )
+                            }
+                        }
+                    } else {
+                        // No groups: a plain list, up to 3 subjects
+                        itemsIndexed(stream.subjects, key = { _, subject -> subject.id }) { index, subject ->
+                            val checked = subject.id in state.selectedIds
+                            SubjectChoiceCard(
+                                name = subject.name,
+                                checked = checked,
+                                // When 3 are chosen the others are locked (a ticked one can always be unticked)
+                                enabled = checked || !state.isFull,
+                                compulsory = false,
+                                palette = subjectPalettes[index % subjectPalettes.size],
+                                onClick = { viewModel.toggle(subject.id) }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "Group 1" pill + "Compulsory" / "Choose one". */
+@Composable
+private fun GroupHeader(group: SubjectGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(shape = CircleShape, color = NenaPrimary) {
+            Text(
+                text = "Group ${group.number}",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = if (group.isCompulsory) "Compulsory subject" else "Choose one",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/** One subject: coloured letter avatar, name and a round tick. */
+@Composable
+private fun SubjectChoiceCard(
+    name: String,
+    checked: Boolean,
+    enabled: Boolean,
+    compulsory: Boolean,
+    palette: IconPalette,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .fillMaxWidth()
+            .alpha(if (enabled) 1f else 0.45f),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (checked) MaterialTheme.colorScheme.primaryContainer
+            else MaterialTheme.colorScheme.surface,
+            disabledContainerColor = MaterialTheme.colorScheme.surface
+        ),
+        border = if (checked) BorderStroke(2.dp, NenaPrimary) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .background(palette.container, RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = name.trim().take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = palette.tint
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Text(
+                text = name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f)
+            )
+
+            if (compulsory) {
+                Text(
+                    text = "Compulsory",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NenaPrimary
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .then(
+                        if (checked) Modifier.background(NenaPrimary, CircleShape)
+                        else Modifier.border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                if (checked) {
+                    Icon(
+                        imageVector = Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
         }
