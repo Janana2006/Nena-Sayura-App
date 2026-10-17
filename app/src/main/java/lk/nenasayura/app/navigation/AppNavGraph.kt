@@ -17,6 +17,7 @@ import androidx.navigation.navArgument
 import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.browse.GuideBrowseSelection
+import lk.nenasayura.app.core.browse.GuideBrowseState
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
@@ -309,12 +310,18 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             val target = entry.arguments?.getString("target") ?: Routes.PAPERS
             SubjectSelectScreen(
                 onBack = { navController.popBackStack() },
-                // The choice is saved: go back to the Papers / Marking Schemes landing page
-                onDone = { navController.popBackStack(target, false) },
+                // The choice is saved: go back to the Papers / Marking Schemes / Guide Books landing page
+                onDone = {
+                    // Guide Books reads GuideBrowseSelection: copy the new choice into it
+                    GuideBrowseSelection.selectFrom(PaperBrowseSelection.state.value)
+                    navController.popBackStack(target, false)
+                },
                 title = browseTitle(target),
-                hint = if (target == Routes.MARKING_SCHEMES)
-                    "Marking schemes will be shown for these subjects only"
-                else "Papers will be shown for these subjects only"
+                hint = when (target) {
+                    Routes.MARKING_SCHEMES -> "Marking schemes will be shown for these subjects only"
+                    Routes.GUIDE_BOOKS -> "Guide books will be shown for these subjects only"
+                    else -> "Papers will be shown for these subjects only"
+                }
             )
         }
         composable(
@@ -354,13 +361,34 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     )
                 }
             } else {
-                // Guests: unchanged
-                GuideBookCategoriesScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenCategory = { category ->
-                        navController.navigate(Routes.guideBooksRoute(category))
-                    }
-                )
+                // Guests: the same stream + subjects as Papers / Marking Schemes (chosen once, this session only)
+                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                if (browse.hasSelection) {
+                    // The subject list of Guide Books reads GuideBrowseSelection, so keep it the same
+                    LaunchedEffect(browse) { GuideBrowseSelection.selectFrom(browse) }
+                    GuideBookCategoriesScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenCategory = { category ->
+                            navController.navigate(Routes.guideBooksRoute(category))
+                        },
+                        selection = GuideBrowseState(
+                            streamId = browse.streamId,
+                            streamName = browse.streamName,
+                            subjects = browse.subjects
+                        ),
+                        onChangeSelection = {
+                            navController.navigate(Routes.guestStreamsRoute(Routes.GUIDE_BOOKS))
+                        }
+                    )
+                } else {
+                    StreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { streamId ->
+                            navController.navigate(Routes.guestSubjectsRoute(Routes.GUIDE_BOOKS, streamId))
+                        },
+                        title = "Guide Books"
+                    )
+                }
             }
         }
         composable(
@@ -396,8 +424,18 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     }
                 }
             } else {
-                // Guests
-                GuideBooksScreen(onBack = { navController.popBackStack() })
+                // Guests: their chosen subjects first, then the books of the chosen subject
+                if (subjectId == null) {
+                    GuideSubjectsScreen(
+                        category = category,
+                        onBack = { navController.popBackStack() },
+                        onOpenSubject = { selectedSubId ->
+                            navController.navigate(Routes.guideBooksRoute(category, selectedSubId))
+                        }
+                    )
+                } else {
+                    GuideBooksScreen(onBack = { navController.popBackStack() })
+                }
             }
         }
 
@@ -557,8 +595,11 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     }
 }
 
-private fun browseTitle(target: String): String =
-    if (target == Routes.MARKING_SCHEMES) "Marking Schemes" else "Papers"
+private fun browseTitle(target: String): String = when (target) {
+    Routes.MARKING_SCHEMES -> "Marking Schemes"
+    Routes.GUIDE_BOOKS -> "Guide Books"
+    else -> "Papers"
+}
 
 private fun NavGraphBuilder.placeholder(
     route: String,

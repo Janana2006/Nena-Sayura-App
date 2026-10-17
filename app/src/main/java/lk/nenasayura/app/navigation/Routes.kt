@@ -35,8 +35,8 @@ object Routes {
     fun quizRoute(quizId: String) = "quiz/$quizId"
 
     // Student-only screens (reached from Student Home)
-    // My teacher flow: teacher list -> teacher materials -> payment -> back to materials (unlocked)
     const val TEACHERS = "teachers"
+    // My teacher: teacher list -> the teacher's materials -> payment
     const val TEACHER_MATERIALS = "teachers/{teacherId}"
     fun teacherMaterialsRoute(teacherId: String) = "teachers/$teacherId"
     const val TEACHER_PAYMENT = "teachers/{teacherId}/pay"
@@ -53,8 +53,8 @@ object Routes {
     // "Change" button on Papers / Marking Schemes / Guide Books: change the stream + subjects
     const val STUDY_EDIT = "study_edit"
 
-    // Guests: Papers / Marking Schemes -> choose stream -> choose subjects -> categories.
-    // [target] is "papers" or "marking_schemes" (the same as the route names above).
+    // Guests: Papers / Marking Schemes / Guide Books -> choose stream -> choose subjects -> categories.
+    // [target] is "papers", "marking_schemes" or "guide_books" (the same as the route names above).
     const val GUEST_STREAMS = "guest_streams/{target}"
     fun guestStreamsRoute(target: String) = "guest_streams/$target"
     const val GUEST_SUBJECTS = "guest_subjects/{target}/{streamId}"

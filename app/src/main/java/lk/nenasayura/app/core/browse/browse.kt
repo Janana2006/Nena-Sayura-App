@@ -34,6 +34,17 @@ object GuideBrowseSelection {
         }
     }
 
+    /** Guests: Guide Books uses the same stream + subjects chosen for Papers / Marking Schemes. */
+    fun selectFrom(browse: PaperBrowseState) {
+        _state.update {
+            GuideBrowseState(
+                streamId = browse.streamId,
+                streamName = browse.streamName,
+                subjects = browse.subjects
+            )
+        }
+    }
+
     fun clear() {
         _state.update { GuideBrowseState() }
     }
