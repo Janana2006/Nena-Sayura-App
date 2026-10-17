@@ -40,7 +40,9 @@ data class StudentHomeActions(
     val onOpenAnalytics: () -> Unit,
     val onOpenQuickAccess: () -> Unit,
     val onOpenReviews: () -> Unit,
-    val onWriteReview: () -> Unit
+    val onWriteReview: () -> Unit,
+    val onOpenDownloads: () -> Unit = {}
+
 )
 
 private enum class StudentTab(val label: String, val title: String, val icon: ImageVector) {

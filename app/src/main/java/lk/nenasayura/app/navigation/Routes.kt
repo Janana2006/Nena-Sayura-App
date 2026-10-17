@@ -44,6 +44,7 @@ object Routes {
     const val TIMETABLE = "timetable"
     const val TIMETABLE_SETUP = "timetable_setup"
     const val REMINDERS = "reminders"
+    const val DOWNLOADS = "downloads"
     const val ANALYTICS = "analytics"
     const val QUICK_ACCESS = "quick_access"
     const val REVIEWS = "reviews"

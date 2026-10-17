@@ -41,7 +41,10 @@ import lk.nenasayura.app.ui.guest.papers.PaperCategoriesScreen
 import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
 import lk.nenasayura.app.ui.student.QuickAccessScreen
+import lk.nenasayura.app.core.reminders.ReminderScheduler
 import lk.nenasayura.app.ui.student.profile.ChangeStudyPage
+import lk.nenasayura.app.ui.student.reminders.RemindersScreen
+import lk.nenasayura.app.ui.student.downloads.DownloadsScreen
 import lk.nenasayura.app.ui.student.papers.StreamSelectScreen
 import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
 import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
@@ -82,6 +85,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     // Sign out kalama Login screen ekata yanawa, mehedi flag eka naha
     // nisa "Continue as Guest" button eka aye pennanawa.
     val openLoginAfterSignOut: () -> Unit = {
+        // Stop every study reminder of the student who is signing out
+        ReminderScheduler.cancelAndClearAsync(context)
         context.startActivity(Intent(context, MainActivity::class.java))
         (context as? Activity)?.finish()
     }
@@ -145,7 +150,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenAnalytics = { navController.navigate(Routes.ANALYTICS) },
                     onOpenQuickAccess = { navController.navigate(Routes.QUICK_ACCESS) },
                     onOpenReviews = { navController.navigate(Routes.REVIEWS) },
-                    onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) }
+                    onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) },
+                    onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) }
                 ),
                 // Teacher dashboard ekata switch (session eka wenas wenakota LaunchedEffect eka navigate karanawa)
                 onRoleChanged = { role ->
@@ -585,7 +591,16 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onFinished = { navController.popBackStack() }
             )
         }
-        placeholder(Routes.REMINDERS, "Reminders", navController)
+        composable(Routes.REMINDERS) {
+            RemindersScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTimetable = { navController.navigate(Routes.TIMETABLE) }
+            )
+        }
+        // Files the student saved inside the app (open without internet)
+        composable(Routes.DOWNLOADS) {
+            DownloadsScreen(onBack = { navController.popBackStack() })
+        }
         composable(Routes.ANALYTICS) {
             if (session.isStudent) {
                 StudyProgressScreen(

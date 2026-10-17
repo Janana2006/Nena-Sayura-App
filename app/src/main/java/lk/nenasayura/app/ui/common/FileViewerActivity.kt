@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
 import androidx.compose.material3.Button
@@ -50,6 +51,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -79,6 +81,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
+import lk.nenasayura.app.util.DownloadStore
 import lk.nenasayura.app.util.FileActions
 import lk.nenasayura.app.util.YouTubeLinks
 import okhttp3.OkHttpClient
@@ -91,7 +94,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Shows a paper / marking scheme / guide book inside the app (no browser).
  * PDFs are drawn page by page, images can be pinch-zoomed.
- * Start it with [FileActions.openFile]. It downloads the file once and keeps it in the cache.
+ * Start it with [FileActions.openFile].
+ * A file the student downloaded (see [DownloadStore]) opens from the phone with no internet.
+ * Otherwise it is downloaded once and kept in the cache.
  */
 class FileViewerActivity : ComponentActivity() {
 
@@ -150,6 +155,13 @@ private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
     var state by remember { mutableStateOf<ViewerState>(ViewerState.Loading(null)) }
     var zoomIndex by remember { mutableIntStateOf(0) }
 
+    // true when this file is saved inside the app (it then opens without internet)
+    remember { DownloadStore.load(context) }
+    val savedItems by DownloadStore.items.collectAsState()
+    val busyIds by DownloadStore.busy.collectAsState()
+    val isSaved = savedItems.any { it.url == url }
+    val isSaving = DownloadStore.idFor(url) in busyIds
+
     // Download (or take from cache), then find out if it is a PDF or an image
     LaunchedEffect(url, attempt) {
         state = ViewerState.Loading(null)
@@ -167,8 +179,15 @@ private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
             throw e
         } catch (e: Exception) {
             ViewerState.Failed(
-                e.message?.takeIf { it.isNotBlank() }
-                    ?: "Could not load the file. Check your internet connection."
+                if (e is java.net.UnknownHostException ||
+                    e is java.net.ConnectException ||
+                    e is java.net.SocketTimeoutException
+                ) {
+                    "No internet connection. Files you downloaded can be opened from Downloads."
+                } else {
+                    e.message?.takeIf { it.isNotBlank() }
+                        ?: "Could not load the file. Check your internet connection."
+                }
             )
         }
     }
@@ -189,8 +208,19 @@ private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
                             enabled = zoomIndex < zoomSteps.lastIndex
                         ) { Icon(Icons.Filled.ZoomIn, contentDescription = "Zoom in") }
                     }
-                    IconButton(onClick = { FileActions.downloadFile(context, url, title) }) {
-                        Icon(Icons.Filled.Download, contentDescription = "Download")
+                    IconButton(
+                        onClick = {
+                            // reuse the copy that is already on the phone, if the viewer has one
+                            val loaded = (state as? ViewerState.Pdf)?.file
+                                ?: (state as? ViewerState.Photo)?.file
+                            FileActions.downloadFile(context, url, title, source = loaded)
+                        },
+                        enabled = !isSaving
+                    ) {
+                        Icon(
+                            imageVector = if (isSaved) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                            contentDescription = if (isSaved) "Saved in the app" else "Download"
+                        )
                     }
                 }
             )
@@ -559,12 +589,20 @@ private val httpClient: OkHttpClient by lazy {
         .build()
 }
 
-/** Downloads [url] into the app cache (only the first time) and returns the file. */
+/**
+ * Returns the file for [url]:
+ *  1) the copy saved in the app (Downloads) - works with no internet
+ *  2) otherwise the cached copy, or it is downloaded now (only the first time)
+ */
 private suspend fun downloadToCache(
     context: Context,
     url: String,
     onProgress: (Int?) -> Unit
 ): File = withContext(Dispatchers.IO) {
+    // 1) Saved inside the app (Downloads): opens with no internet
+    DownloadStore.localFile(context, url)?.let { return@withContext it }
+
+    // 2) Otherwise take it from the cache, or download it now
     val dir = File(context.cacheDir, "viewer").apply { mkdirs() }
     val target = File(dir, sha256(url).take(24))
     if (target.exists() && target.length() > 0) return@withContext target

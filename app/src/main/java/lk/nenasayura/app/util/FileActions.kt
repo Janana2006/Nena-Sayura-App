@@ -1,22 +1,20 @@
 package lk.nenasayura.app.util
 
-
-
 import android.app.Activity
-import android.app.DownloadManager
 import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Environment
 import android.widget.Toast
 import lk.nenasayura.app.ui.common.FileViewerActivity
+import java.io.File
 
 /** Opens or downloads a document (paper, marking scheme, guide book...) from its URL. */
 object FileActions {
 
     /**
      * Opens the file inside the app (PDF pages / image viewer).
+     * If the file was downloaded before, the saved copy is used, so it also works offline.
      * [title] is shown in the top bar of the viewer.
      */
     fun openFile(context: Context, url: String, title: String = "") {
@@ -45,42 +43,35 @@ object FileActions {
         }
     }
 
-    /** Saves the file to Downloads/NenaSayura using the system DownloadManager. */
-    fun downloadFile(context: Context, url: String, title: String) {
+    /**
+     * Saves the file INSIDE the app (see [DownloadStore]) so it can be opened later without
+     * internet. The student finds it again on the Downloads screen.
+     * [source] is the copy the viewer already has on the disk (avoids downloading twice).
+     */
+    fun downloadFile(context: Context, url: String, title: String, source: File? = null) {
         if (url.isBlank()) {
             toast(context, "The file link is missing.")
             return
         }
-        try {
-            val request = DownloadManager.Request(Uri.parse(url))
-                .setTitle(title)
-                .setDescription("Nena Sayura")
-                .setNotificationVisibility(
-                    DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-                )
-                .setDestinationInExternalPublicDir(
-                    Environment.DIRECTORY_DOWNLOADS,
-                    "NenaSayura/${buildFileName(title, url)}"
-                )
-            val manager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-            manager.enqueue(request)
-            toast(context, "Download started. Check your notifications.")
-        } catch (e: Exception) {
-            toast(context, "Could not start the download.")
+        // A YouTube link is a video page, not a file
+        if (YouTubeLinks.extractId(url) != null) {
+            toast(context, "Videos can't be downloaded. Open it to watch online.")
+            return
+        }
+        if (DownloadStore.isSaved(context, url)) {
+            toast(context, "Already saved. Find it in Downloads.")
+            return
+        }
+        toast(context, "Downloading...")
+        DownloadStore.save(context, url, title, source) { error ->
+            toast(
+                context,
+                error ?: "Saved in the app. Find it in Downloads (works offline)."
+            )
         }
     }
 
-    // "Chemistry 2023 Paper I" + ".../x.pdf?alt=media" -> "Chemistry_2023_Paper_I.pdf"
-    private fun buildFileName(title: String, url: String): String {
-        val safeTitle = title.replace(Regex("[^A-Za-z0-9]+"), "_").trim('_').ifBlank { "document" }
-        val lastSegment = Uri.parse(url).lastPathSegment ?: ""
-        val extension = lastSegment.substringAfterLast('.', "pdf")
-            .takeIf { it.length in 2..5 && it.all { c -> c.isLetterOrDigit() } }
-            ?: "pdf"
-        return "$safeTitle.$extension"
-    }
-
     private fun toast(context: Context, message: String) {
-        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        Toast.makeText(context.applicationContext, message, Toast.LENGTH_SHORT).show()
     }
 }

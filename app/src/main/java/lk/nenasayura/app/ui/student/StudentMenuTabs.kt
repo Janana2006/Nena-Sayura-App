@@ -23,6 +23,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -56,6 +57,7 @@ fun StudentResourcesTab(actions: StudentHomeActions, modifier: Modifier = Modifi
         MenuItemCard("Quizzes", "Practice MCQs with explanations", Icons.Filled.Quiz, actions.onOpenQuizzes, palette = NenaIconColors.Quizzes)
         MenuItemCard("Guide Books", "Teacher guides and study books", Icons.AutoMirrored.Filled.MenuBook, actions.onOpenGuideBooks, palette = NenaIconColors.GuideBooks)
         MenuItemCard("Search", "Find any subject or resource", Icons.Filled.Search, actions.onOpenSearch, palette = NenaIconColors.Progress)
+        MenuItemCard("Downloads", "Saved in the app, open without internet", Icons.Filled.DownloadDone, actions.onOpenDownloads, palette = NenaIconColors.Papers)
     }
 }
 
