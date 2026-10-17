@@ -46,6 +46,7 @@ import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import java.time.LocalDate
+import lk.nenasayura.app.core.reminders.ReminderSyncWorker
 
 /**
  * The student's Timetable: Day and Week views, progress, and the session actions.
@@ -71,6 +72,8 @@ fun TimetableScreen(
 
     // Loads when the screen opens, and again after coming back from the setup or a resource
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    // When the student leaves the Timetable, refresh the reminders (does nothing if reminders are off)
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { ReminderSyncWorker.syncNow(context) }
 
     // Short messages ("Moved to Tuesday...") appear once as a toast
     LaunchedEffect(state.actionMessage) {

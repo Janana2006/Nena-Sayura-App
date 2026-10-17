@@ -45,6 +45,8 @@ import lk.nenasayura.app.ui.student.profile.ChangeStudyPage
 import lk.nenasayura.app.ui.student.quizzes.QuizStreamSelectScreen
 import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import lk.nenasayura.app.core.reminders.ReminderScheduler
+import lk.nenasayura.app.ui.student.reminders.RemindersScreen
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
@@ -77,6 +79,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     // Sign out kalama Login screen ekata yanawa, mehedi flag eka naha
     // nisa "Continue as Guest" button eka aye pennanawa.
     val openLoginAfterSignOut: () -> Unit = {
+        // Stop every study reminder of the student who is signing out
+        ReminderScheduler.cancelAndClearAsync(context)
         context.startActivity(Intent(context, MainActivity::class.java))
         (context as? Activity)?.finish()
     }
@@ -420,7 +424,12 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onFinished = { navController.popBackStack() }
             )
         }
-        placeholder(Routes.REMINDERS, "Reminders", navController)
+        composable(Routes.REMINDERS) {
+            RemindersScreen(
+                onBack = { navController.popBackStack() },
+                onOpenTimetable = { navController.navigate(Routes.TIMETABLE) }
+            )
+        }
         composable(Routes.ANALYTICS) {
             if (session.isStudent) {
                 StudyProgressScreen(
