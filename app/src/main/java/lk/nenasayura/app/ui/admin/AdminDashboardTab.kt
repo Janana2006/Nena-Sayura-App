@@ -38,7 +38,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import lk.nenasayura.app.data.model.AdminPermission
+import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
@@ -54,6 +59,12 @@ fun AdminDashboardTab(
     onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // pending uploads + uploads the admin has not looked at yet (shown in the banner below)
+    val context = LocalContext.current
+    UploadSeenStore.init(context)
+    val seenUploads by UploadSeenStore.seen.collectAsStateWithLifecycle()
+    val newUploads = UploadSeenStore.attentionCount(state.teacherContents, seenUploads)
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -121,6 +132,48 @@ fun AdminDashboardTab(
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     rowItems.forEach { (label, value) -> StatCard(label, value, Modifier.weight(1f)) }
                     repeat(3 - rowItems.size) { Spacer(modifier = Modifier.weight(1f)) }
+                }
+            }
+
+            // ---- New teacher uploads the admin has not looked at yet ----
+            if (state.can(AdminPermission.TEACHER_UPLOADS) && newUploads > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    onClick = onOpenContent,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = NenaAccentContainer),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Folder,
+                            contentDescription = null,
+                            tint = Color(0xFF6B4A00),
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Column(modifier = Modifier.padding(start = 14.dp)) {
+                            Text(
+                                text = if (state.pendingCount > 0) {
+                                    "${state.pendingCount} upload" +
+                                            (if (state.pendingCount == 1) "" else "s") + " waiting for approval"
+                                } else {
+                                    "$newUploads new teacher upload" + (if (newUploads == 1) "" else "s")
+                                },
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF3B2A00)
+                            )
+                            Text(
+                                text = "Tap to review",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF6B4A00)
+                            )
+                        }
+                    }
                 }
             }
 

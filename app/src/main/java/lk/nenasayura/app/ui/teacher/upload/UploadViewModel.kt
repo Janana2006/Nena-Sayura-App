@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.TeacherContentRepository
@@ -30,7 +31,9 @@ data class UploadUiState(
     val isUploading: Boolean = false,
     val errorMessage: String? = null,
     /** Becomes true once after a successful upload; the screen reads it and calls [UploadViewModel.clearUploaded]. */
-    val uploadedOk: Boolean = false
+    val uploadedOk: Boolean = false,
+    /** PENDING = sent to the admin, APPROVED = already live for students. */
+    val uploadedStatus: ContentStatus = ContentStatus.APPROVED
 )
 
 class UploadViewModel(
@@ -108,7 +111,7 @@ class UploadViewModel(
         _state.update { it.copy(isUploading = true, errorMessage = null) }
         viewModelScope.launch {
             try {
-                repository.upload(
+                val savedStatus = repository.upload(
                     teacherId = teacherId,
                     teacherName = teacherName,
                     title = s.title,
@@ -133,7 +136,8 @@ class UploadViewModel(
                         answerFileName = "",
                         videoUrl = "",
                         isUploading = false,
-                        uploadedOk = true
+                        uploadedOk = true,
+                        uploadedStatus = savedStatus
                     )
                 }
             } catch (e: CancellationException) {

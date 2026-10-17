@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.common
 
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
@@ -34,6 +35,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material.icons.filled.ZoomOut
@@ -77,6 +79,7 @@ import kotlinx.coroutines.withContext
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.util.YouTubeLinks
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
@@ -134,6 +137,13 @@ private val zoomSteps = listOf(1f, 1.5f, 2f, 2.5f)
 
 @Composable
 private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
+    // A YouTube link is not a file: play the video here instead of trying to download it
+    val videoId = remember(url) { YouTubeLinks.extractId(url) }
+    if (videoId != null) {
+        VideoViewerScreen(videoId = videoId, title = title, onBack = onBack)
+        return
+    }
+
     val context = LocalContext.current
     var attempt by remember { mutableIntStateOf(0) }
     var state by remember { mutableStateOf<ViewerState>(ViewerState.Loading(null)) }
@@ -208,6 +218,66 @@ private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
 
                 is ViewerState.Pdf -> PdfViewer(file = s.file, zoom = zoomSteps[zoomIndex])
                 is ViewerState.Photo -> PhotoViewer(file = s.file)
+            }
+        }
+    }
+}
+
+/** Plays a YouTube video inside the app (16:9 in portrait, full screen in landscape). */
+@Composable
+private fun VideoViewerScreen(videoId: String, title: String, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    Scaffold(
+        topBar = {
+            NenaTopBar(
+                title = title,
+                onBack = onBack,
+                actions = {
+                    // open the same video in the YouTube app
+                    IconButton(
+                        onClick = {
+                            FileActions.openExternally(context, YouTubeLinks.watchUrl(videoId))
+                        }
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Open in YouTube")
+                    }
+                }
+            )
+        },
+        containerColor = Color(0xFF0E1116)
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+        ) {
+            Box(
+                modifier = if (landscape) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                }
+            ) {
+                YouTubePlayer(videoId = videoId, modifier = Modifier.fillMaxSize())
+            }
+            if (!landscape) {
+                Text(
+                    text = title,
+                    modifier = Modifier.padding(16.dp),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                Text(
+                    text = "Video not playing? Tap the icon at the top to open it in YouTube.",
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.55f)
+                )
             }
         }
     }

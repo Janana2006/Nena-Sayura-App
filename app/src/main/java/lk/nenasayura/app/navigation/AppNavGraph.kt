@@ -48,6 +48,9 @@ import lk.nenasayura.app.ui.student.quizzes.QuizListScreen as StudentQuizListScr
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherListScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherMaterialsScreen
+import lk.nenasayura.app.ui.student.teachercontent.TeacherPaymentScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 import lk.nenasayura.app.ui.student.timetable.PlannerSetupScreen
 import lk.nenasayura.app.ui.student.timetable.TimetableScreen
@@ -468,7 +471,62 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             WriteReviewScreen(onBack = { navController.popBackStack() })
         }
         // Student-only screens: each is replaced by a real screen in its own task
-        placeholder(Routes.TEACHERS, "Teachers", navController)
+        // My teacher: 1) teacher list (free first, then paid)
+        composable(Routes.TEACHERS) {
+            val openTeacher: (String) -> Unit = { teacherId ->
+                navController.navigate(Routes.teacherMaterialsRoute(teacherId))
+            }
+            if (session.isStudent) {
+                // Students: the stream + subjects chosen at sign-up decide which teachers are shown
+                StudentStudyGate(
+                    title = "My teacher",
+                    onBack = { navController.popBackStack() },
+                    onChange = { navController.navigate(Routes.STUDY_EDIT) }
+                ) {
+                    val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                    TeacherListScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenTeacher = openTeacher,
+                        selection = browse,
+                        onChangeSelection = { navController.navigate(Routes.STUDY_EDIT) }
+                    )
+                }
+            } else {
+                TeacherListScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenTeacher = openTeacher
+                )
+            }
+        }
+        // 2) the chosen teacher's materials (paid teacher: fee + Pay button)
+        composable(
+            route = Routes.TEACHER_MATERIALS,
+            arguments = listOf(navArgument("teacherId") { type = NavType.StringType })
+        ) { entry ->
+            val teacherId = entry.arguments?.getString("teacherId").orEmpty()
+            TeacherMaterialsScreen(
+                teacherId = teacherId,
+                onBack = { navController.popBackStack() },
+                onPay = { navController.navigate(Routes.teacherPaymentRoute(teacherId)) }
+            )
+        }
+        // 3) payment dashboard -> confirm -> success -> back to the (now unlocked) materials
+        composable(
+            route = Routes.TEACHER_PAYMENT,
+            arguments = listOf(navArgument("teacherId") { type = NavType.StringType })
+        ) { entry ->
+            val teacherId = entry.arguments?.getString("teacherId").orEmpty()
+            TeacherPaymentScreen(
+                teacherId = teacherId,
+                onBack = { navController.popBackStack() },
+                onPaid = {
+                    // Remove the old materials screen + payment screen, then open a fresh materials screen
+                    navController.navigate(Routes.teacherMaterialsRoute(teacherId)) {
+                        popUpTo(Routes.TEACHER_MATERIALS) { inclusive = true }
+                    }
+                }
+            )
+        }
         composable(Routes.TIMETABLE) {
             TimetableScreen(
                 onBack = { navController.popBackStack() },

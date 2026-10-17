@@ -25,6 +25,24 @@ enum class AccessType(val key: String, val label: String) {
     }
 }
 
+/**
+ * Review state of an upload.
+ * PENDING  = waiting for the admin (students cannot see it),
+ * APPROVED = visible to students,
+ * DECLINED = rejected by the admin (the teacher sees the reason).
+ * Old documents that have no "status" field count as APPROVED, so nothing disappears.
+ */
+enum class ContentStatus(val key: String, val label: String) {
+    PENDING("pending", "Pending"),
+    APPROVED("approved", "Approved"),
+    DECLINED("declined", "Declined");
+
+    companion object {
+        fun fromKey(key: String?): ContentStatus =
+            entries.firstOrNull { it.key == key } ?: APPROVED
+    }
+}
+
 /** One item uploaded by a teacher (Firestore collection "teacher_content"). */
 data class TeacherContent(
     val id: String = "",
@@ -43,6 +61,10 @@ data class TeacherContent(
     val answerFileName: String = "",
     val answerStoragePath: String = "",
     val videoUrl: String = "",
+    val status: ContentStatus = ContentStatus.APPROVED,
+    /** The message the admin wrote when declining (empty otherwise). */
+    val declineReason: String = "",
+    val reviewedAtMillis: Long = 0L,
     val createdAtMillis: Long = 0L
 ) {
     /** The link a student (or the teacher) opens: the video link, or the uploaded file. */

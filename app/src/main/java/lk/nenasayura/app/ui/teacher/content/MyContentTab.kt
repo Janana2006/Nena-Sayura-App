@@ -57,6 +57,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.ui.common.EmptyView
@@ -230,6 +231,58 @@ private fun ContentCard(
                 } else {
                     Badge(text = "Free", background = NenaSecondaryContainer, textColor = Color(0xFF004D40))
                 }
+                StatusBadge(content.status)
+            }
+
+            // Review result: waiting / live / declined (with the admin's message)
+            Spacer(modifier = Modifier.height(8.dp))
+            when (content.status) {
+                ContentStatus.PENDING -> Text(
+                    text = "Waiting for admin approval. Students can't see this yet.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF6B4A00)
+                )
+
+                ContentStatus.APPROVED -> Text(
+                    text = if (content.reviewedAtMillis > 0L) {
+                        "Approved on ${formatDate(content.reviewedAtMillis)}. Students can see this."
+                    } else {
+                        "Live. Students can see this."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF004D40)
+                )
+
+                ContentStatus.DECLINED -> Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color(0xFFFFDAD6),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = if (content.reviewedAtMillis > 0L) {
+                                "Declined on ${formatDate(content.reviewedAtMillis)}"
+                            } else {
+                                "Declined by admin"
+                            },
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF93000A)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = content.declineReason.ifBlank { "No reason was given." },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF410002)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Edit it and save to send it for approval again.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF410002)
+                        )
+                    }
+                }
             }
 
             if (content.description.isNotBlank()) {
@@ -283,6 +336,15 @@ private fun ContentCard(
 }
 
 @Composable
+private fun StatusBadge(status: ContentStatus) {
+    when (status) {
+        ContentStatus.PENDING -> Badge("Pending", NenaAccentContainer, Color(0xFF6B4A00))
+        ContentStatus.APPROVED -> Badge("Live", NenaSecondaryContainer, Color(0xFF004D40))
+        ContentStatus.DECLINED -> Badge("Declined", Color(0xFFFFDAD6), Color(0xFF93000A))
+    }
+}
+
+@Composable
 private fun Badge(text: String, background: Color, textColor: Color) {
     Surface(shape = RoundedCornerShape(8.dp), color = background) {
         Text(
@@ -323,6 +385,11 @@ private fun EditDialog(
                     label = { Text("Description") },
                     minLines = 2,
                     modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = "If your account needs approval, the admin checks the new version.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (canChooseAccess) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

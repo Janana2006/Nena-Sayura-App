@@ -5,8 +5,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherContent
@@ -15,12 +17,23 @@ import lk.nenasayura.app.util.CloudinaryUploader
 /**
  * Teacher uploads: the file goes to Cloudinary, the details go to the
  * Firestore "teacher_content" collection.
+ *
+ * Who needs approval:
+ *  - A teacher who REGISTERED as a teacher: the upload is live for students at once.
+ *  - A student who later switched to / added the teacher role (the account has a
+ *    "teacherStudy" map): the upload goes to the admin first.
+ *      uploads          -> status = "pending"
+ *      admin approves   -> status = "approved"  (students can see it)
+ *      admin declines   -> status = "declined"  + declineReason (the teacher reads it)
+ * The admin sees every upload in the admin dashboard and can remove any of them.
  */
 class TeacherContentRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
-    /** Everything one teacher has uploaded, newest first. */
+    // ---------------- teacher ----------------
+
+    /** Everything one teacher has uploaded (every status), newest first. */
     suspend fun getContents(teacherId: String): List<TeacherContent> {
         val snapshot = db.collection(COLLECTION)
             .whereEqualTo("teacherId", teacherId)
@@ -45,7 +58,7 @@ class TeacherContentRepository(
         videoUrl: String,
         answerFileUri: Uri? = null,
         answerFileName: String = ""
-    ) {
+    ): ContentStatus {
         var fileUrl = ""
         var answerFileUrl = ""
         val context = FirebaseApp.getInstance().applicationContext
@@ -77,6 +90,8 @@ class TeacherContentRepository(
         }
 
         // 2) Save the details in Firestore.
+        //    A registered teacher is live at once; a student who became a teacher waits for the admin.
+        val status = if (needsApproval(teacherId)) ContentStatus.PENDING else ContentStatus.APPROVED
         val data = hashMapOf(
             "teacherId" to teacherId,
             "teacherName" to teacherName,
@@ -93,20 +108,52 @@ class TeacherContentRepository(
             "answerFileName" to answerFileName,
             "answerStoragePath" to "",
             "videoUrl" to videoUrl.trim(),
+            "status" to status.key,
+            "declineReason" to "",
             "createdAt" to FieldValue.serverTimestamp()
         )
         db.collection(COLLECTION).add(data).await()
+        return status
     }
 
-    /** Edits the text and the Free/Paid choice (the file itself is not replaced). */
-    suspend fun update(id: String, title: String, description: String, access: AccessType) {
-        db.collection(COLLECTION).document(id).update(
-            mapOf(
-                "title" to title.trim(),
-                "description" to description.trim(),
-                "access" to access.key
-            )
-        ).await()
+    /**
+     * A student who added the teacher role later keeps the teaching stream and subject in a
+     * "teacherStudy" map. A teacher who registered as a teacher has no such map.
+     */
+    private suspend fun needsApproval(teacherId: String): Boolean = try {
+        db.collection("users").document(teacherId).get().await().get("teacherStudy") != null
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+    /**
+     * Edits the text and the Free/Paid choice (the file itself is not replaced).
+     * A registered teacher's change is live at once. A student-turned-teacher's edited item
+     * goes back to PENDING so the admin checks the new version.
+     * Returns the status the item has now.
+     */
+    suspend fun update(
+        content: TeacherContent,
+        title: String,
+        description: String,
+        access: AccessType
+    ): ContentStatus {
+        val status = if (needsApproval(content.teacherId)) ContentStatus.PENDING else ContentStatus.APPROVED
+        val data = mutableMapOf<String, Any>(
+            "title" to title.trim(),
+            "description" to description.trim(),
+            "access" to access.key,
+            "status" to status.key,
+            "declineReason" to ""
+        )
+        if (status == ContentStatus.PENDING) {
+            data["reviewedAt"] = FieldValue.delete()
+            data["reviewedBy"] = FieldValue.delete()
+        }
+        db.collection(COLLECTION).document(content.id).update(data).await()
+        return status
     }
 
     /**
@@ -115,6 +162,86 @@ class TeacherContentRepository(
      */
     suspend fun delete(content: TeacherContent) {
         db.collection(COLLECTION).document(content.id).delete().await()
+    }
+
+    // ---------------- student ----------------
+
+    /**
+     * Everything students can see, newest first: APPROVED uploads only.
+     * Uploads of registered teachers are approved when they are saved; a student-turned-teacher's
+     * uploads show up after the admin approves them. Pending and declined items stay hidden.
+     * (When the admin removes an upload it is deleted, so it is simply gone.)
+     */
+    suspend fun getVisibleContents(): List<TeacherContent> {
+        val snapshot = db.collection(COLLECTION)
+            .whereEqualTo("status", ContentStatus.APPROVED.key)
+            .get()
+            .await()
+        return snapshot.documents
+            .map { it.toContent() }
+            .sortedByDescending { it.createdAtMillis }
+    }
+
+    /** The same, for ONE teacher (the student's teacher page). */
+    suspend fun getVisibleContents(teacherId: String): List<TeacherContent> {
+        val snapshot = db.collection(COLLECTION)
+            .whereEqualTo("status", ContentStatus.APPROVED.key)
+            .whereEqualTo("teacherId", teacherId)
+            .get()
+            .await()
+        return snapshot.documents
+            .map { it.toContent() }
+            .sortedByDescending { it.createdAtMillis }
+    }
+
+    // ---------------- admin ----------------
+
+    /**
+     * Every upload of every teacher, newest first, for the admin dashboard.
+     * Old documents made before the approval flow have no "status"; they are
+     * marked "approved" here once, so they keep showing to students.
+     */
+    suspend fun getAllForReview(): List<TeacherContent> {
+        val snapshot = db.collection(COLLECTION).get().await()
+
+        val old = snapshot.documents.filter { !it.contains("status") }
+        if (old.isNotEmpty()) {
+            try {
+                old.chunked(400).forEach { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { batch.update(it.reference, "status", ContentStatus.APPROVED.key) }
+                    batch.commit().await()
+                }
+            } catch (e: Exception) {
+                // Not fatal: the list below still treats them as approved.
+            }
+        }
+
+        return snapshot.documents
+            .map { it.toContent() }
+            .sortedByDescending { it.createdAtMillis }
+    }
+
+    suspend fun approve(id: String, adminUid: String) {
+        db.collection(COLLECTION).document(id).update(
+            mapOf(
+                "status" to ContentStatus.APPROVED.key,
+                "declineReason" to "",
+                "reviewedAt" to FieldValue.serverTimestamp(),
+                "reviewedBy" to adminUid
+            )
+        ).await()
+    }
+
+    suspend fun decline(id: String, reason: String, adminUid: String) {
+        db.collection(COLLECTION).document(id).update(
+            mapOf(
+                "status" to ContentStatus.DECLINED.key,
+                "declineReason" to reason.trim(),
+                "reviewedAt" to FieldValue.serverTimestamp(),
+                "reviewedBy" to adminUid
+            )
+        ).await()
     }
 
     // If the real field names differ, change them here only.
@@ -135,6 +262,9 @@ class TeacherContentRepository(
         answerFileName = getString("answerFileName") ?: "",
         answerStoragePath = getString("answerStoragePath") ?: "",
         videoUrl = getString("videoUrl") ?: "",
+        status = ContentStatus.fromKey(getString("status")),
+        declineReason = getString("declineReason") ?: "",
+        reviewedAtMillis = getTimestamp("reviewedAt")?.toDate()?.time ?: 0L,
         createdAtMillis = getTimestamp("createdAt")?.toDate()?.time ?: 0L
     )
 

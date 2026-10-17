@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
@@ -143,8 +144,14 @@ fun TeacherHomeScreen(
 
                 TeacherTab.Upload -> UploadScreen(
                     profile = profile,
-                    onUploaded = {
-                        viewModel.refreshContent(message = "Uploaded successfully")
+                    onUploaded = { status ->
+                        viewModel.refreshContent(
+                            message = if (status == ContentStatus.PENDING) {
+                                "Uploaded. Sent to the admin for approval."
+                            } else {
+                                "Uploaded. Students can see it now."
+                            }
+                        )
                         selectedIndex = TeacherTab.Content.ordinal
                     },
                     modifier = Modifier.padding(innerPadding)

@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.AccessType
+import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.ContentType
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherProfile
@@ -79,7 +80,7 @@ private val FILE_TYPES = arrayOf(
 @Composable
 fun UploadScreen(
     profile: TeacherProfile,
-    onUploaded: () -> Unit,
+    onUploaded: (ContentStatus) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: UploadViewModel = viewModel()
 ) {
@@ -91,7 +92,7 @@ fun UploadScreen(
     // After a successful upload: tell the Home screen once, then reset the flag.
     LaunchedEffect(state.uploadedOk) {
         if (state.uploadedOk) {
-            onUploaded()
+            onUploaded(state.uploadedStatus)
             viewModel.clearUploaded()
         }
     }
