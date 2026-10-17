@@ -25,6 +25,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -54,6 +58,8 @@ fun VideoPlayerDialog(
     val context = LocalContext.current
     val videoId = YouTubeLinks.extractId(videoUrl)
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // true = show the normal YouTube page (for videos that cannot be embedded)
+    var watchPage by remember(videoUrl) { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onClose,
@@ -113,7 +119,12 @@ fun VideoPlayerDialog(
                                 .aspectRatio(16f / 9f)
                         }
                     ) {
-                        YouTubePlayer(videoId = videoId, modifier = Modifier.fillMaxSize())
+                        YouTubePlayer(
+                            videoId = videoId,
+                            modifier = Modifier.fillMaxSize(),
+                            watchPage = watchPage,
+                            onEmbedFailed = { watchPage = true }
+                        )
                     }
 
                     if (!landscape) {
@@ -138,11 +149,17 @@ fun VideoPlayerDialog(
                                 )
                             }
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Video not playing? Tap YouTube at the top to open it there.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White.copy(alpha = 0.55f)
-                            )
+                            if (!watchPage) {
+                                TextButton(onClick = { watchPage = true }) {
+                                    Text("Video not playing? Try the YouTube page", color = Color(0xFF8AB4F8))
+                                }
+                            } else {
+                                Text(
+                                    text = "Playing with the YouTube page. Tap YouTube at the top to open it in the YouTube app.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color.White.copy(alpha = 0.55f)
+                                )
+                            }
                         }
                     }
                 }

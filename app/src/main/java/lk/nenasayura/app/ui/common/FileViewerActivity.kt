@@ -46,6 +46,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -228,6 +229,8 @@ private fun FileViewerScreen(url: String, title: String, onBack: () -> Unit) {
 private fun VideoViewerScreen(videoId: String, title: String, onBack: () -> Unit) {
     val context = LocalContext.current
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    // true = show the normal YouTube page (for videos that cannot be embedded)
+    var watchPage by remember(videoId) { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -262,7 +265,12 @@ private fun VideoViewerScreen(videoId: String, title: String, onBack: () -> Unit
                         .aspectRatio(16f / 9f)
                 }
             ) {
-                YouTubePlayer(videoId = videoId, modifier = Modifier.fillMaxSize())
+                YouTubePlayer(
+                    videoId = videoId,
+                    modifier = Modifier.fillMaxSize(),
+                    watchPage = watchPage,
+                    onEmbedFailed = { watchPage = true }
+                )
             }
             if (!landscape) {
                 Text(
@@ -272,12 +280,21 @@ private fun VideoViewerScreen(videoId: String, title: String, onBack: () -> Unit
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
-                Text(
-                    text = "Video not playing? Tap the icon at the top to open it in YouTube.",
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.55f)
-                )
+                if (!watchPage) {
+                    TextButton(
+                        onClick = { watchPage = true },
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    ) {
+                        Text("Video not playing? Try the YouTube page", color = Color(0xFF8AB4F8))
+                    }
+                } else {
+                    Text(
+                        text = "Playing with the YouTube page. You can also open it in the YouTube app with the icon at the top.",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.55f)
+                    )
+                }
             }
         }
     }

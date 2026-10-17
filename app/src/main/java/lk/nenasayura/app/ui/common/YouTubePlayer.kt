@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.common
 
 import android.annotation.SuppressLint
 import android.view.ViewGroup
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -9,7 +10,10 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -18,11 +22,25 @@ import androidx.compose.ui.viewinterop.AndroidView
 /**
  * The YouTube player inside a WebView, so a video plays inside the app.
  * Used by the file viewer and by the student's video dialog.
+ *
+ * Some videos cannot be embedded (the owner switched embedding off: "Error 152"). Then
+ *  - [onEmbedFailed] is called, and
+ *  - when [watchPage] is true the normal YouTube mobile page is shown inside the same WebView,
+ *    which plays those videos too.
+ * The caller keeps the [watchPage] flag (set it in [onEmbedFailed] or from a button).
  */
-@SuppressLint("SetJavaScriptEnabled")
+@SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
 @Composable
-fun YouTubePlayer(videoId: String, modifier: Modifier = Modifier) {
+fun YouTubePlayer(
+    videoId: String,
+    modifier: Modifier = Modifier,
+    watchPage: Boolean = false,
+    onEmbedFailed: () -> Unit = {}
+) {
     val context = LocalContext.current
+    val currentWatchPage by rememberUpdatedState(watchPage)
+    val currentOnFailed by rememberUpdatedState(onEmbedFailed)
+
     val webView = remember(videoId) {
         WebView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
@@ -35,12 +53,29 @@ fun YouTubePlayer(videoId: String, modifier: Modifier = Modifier) {
             settings.mediaPlaybackRequiresUserGesture = false
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
-                // Stay in the player: a tap on the logo or a link must not open the YouTube site here
                 override fun shouldOverrideUrlLoading(
                     view: WebView?,
                     request: WebResourceRequest?
-                ): Boolean = request?.isForMainFrame == true && request.hasGesture()
+                ): Boolean {
+                    if (request?.isForMainFrame != true) return false
+                    return if (currentWatchPage) {
+                        // YouTube page mode: stay on YouTube / Google (cookie and consent pages)
+                        val host = request.url.host.orEmpty()
+                        !(host.endsWith("youtube.com") || host.endsWith("google.com") ||
+                                host.endsWith("gstatic.com") || host.endsWith("googlevideo.com"))
+                    } else {
+                        // Player mode: a tap on the logo or a link must not open the site here
+                        request.hasGesture()
+                    }
+                }
             }
+            // The player tells us when YouTube refuses to play the video inside an app
+            addJavascriptInterface(object {
+                @JavascriptInterface
+                fun onPlayerError(code: Int) {
+                    post { currentOnFailed() }
+                }
+            }, "Android")
             // The base URL gives the player the origin (referer) YouTube asks for when embedding
             loadDataWithBaseURL(
                 "https://www.youtube.com",
@@ -50,6 +85,11 @@ fun YouTubePlayer(videoId: String, modifier: Modifier = Modifier) {
                 null
             )
         }
+    }
+
+    // Switch to the normal YouTube page when asked
+    LaunchedEffect(watchPage, webView) {
+        if (watchPage) webView.loadUrl("https://m.youtube.com/watch?v=$videoId")
     }
 
     // Stop the video (and its sound) when the player is closed
@@ -65,6 +105,7 @@ fun YouTubePlayer(videoId: String, modifier: Modifier = Modifier) {
     AndroidView(modifier = modifier.background(Color.Black), factory = { webView })
 }
 
+// The IFrame API reports errors (video cannot be embedded, removed, private...) to the app
 private fun playerHtml(videoId: String): String = """
     <!DOCTYPE html>
     <html>
@@ -72,16 +113,28 @@ private fun playerHtml(videoId: String): String = """
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <style>
         html, body { margin: 0; padding: 0; height: 100%; background: #000; overflow: hidden; }
-        iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0; }
+        #player { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
       </style>
     </head>
     <body>
-      <iframe
-        src="https://www.youtube.com/embed/$videoId?autoplay=1&playsinline=1&rel=0&modestbranding=1&fs=0"
-        allow="autoplay; encrypted-media; picture-in-picture"
-        referrerpolicy="strict-origin-when-cross-origin"
-        allowfullscreen>
-      </iframe>
+      <div id="player"></div>
+      <script src="https://www.youtube.com/iframe_api"></script>
+      <script>
+        function onYouTubeIframeAPIReady() {
+          new YT.Player('player', {
+            width: '100%',
+            height: '100%',
+            videoId: '$videoId',
+            playerVars: {
+              autoplay: 1, playsinline: 1, rel: 0, modestbranding: 1, fs: 0,
+              origin: 'https://www.youtube.com'
+            },
+            events: {
+              onError: function (e) { Android.onPlayerError(e.data); }
+            }
+          });
+        }
+      </script>
     </body>
     </html>
 """.trimIndent()
