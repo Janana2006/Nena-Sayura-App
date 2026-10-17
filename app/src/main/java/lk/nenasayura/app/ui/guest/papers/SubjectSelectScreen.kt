@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,7 +57,7 @@ private val subjectPalettes = listOf(
     NenaIconColors.Timetable
 )
 
-/** Step 2 (Papers / Marking Schemes): tick up to 3 subjects of the chosen stream, then Continue. */
+/** Step 2 (Papers / Marking Schemes): subjects in Group 1, 2, 3 (one from each group), then Continue. */
 @Composable
 fun SubjectSelectScreen(
     onBack: () -> Unit,
@@ -77,14 +78,17 @@ fun SubjectSelectScreen(
                 Surface(shadowElevation = 8.dp, color = MaterialTheme.colorScheme.surface) {
                     Button(
                         onClick = { if (viewModel.confirm()) onDone() },
-                        enabled = state.selectedIds.isNotEmpty(),
+                        enabled = state.canContinue,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(16.dp)
                     ) {
                         Text(
-                            if (state.selectedIds.isEmpty()) "Select at least one subject"
-                            else "Continue (${state.selectedIds.size} selected)"
+                            when {
+                                state.canContinue -> "Continue (${state.selectedIds.size} selected)"
+                                state.hasGroups -> "Choose one subject from each group"
+                                else -> "Select at least one subject"
+                            }
                         )
                     }
                 }
@@ -144,20 +148,69 @@ fun SubjectSelectScreen(
                         }
                     }
 
-                    itemsIndexed(stream.subjects, key = { _, subject -> subject.id }) { index, subject ->
-                        val checked = subject.id in state.selectedIds
-                        SubjectChoiceCard(
-                            name = subject.name,
-                            checked = checked,
-                            // When 3 are chosen the others are locked (but a ticked one can always be unticked)
-                            enabled = checked || !state.isFull,
-                            palette = subjectPalettes[index % subjectPalettes.size],
-                            onClick = { viewModel.toggle(subject.id) }
-                        )
+                    if (state.hasGroups) {
+                        // Group 1, Group 2, Group 3 ... (choose one subject in each)
+                        state.groups.forEach { group ->
+                            item(key = "header_${group.number}") {
+                                GroupHeader(group)
+                            }
+                            items(group.subjects, key = { subject -> "${group.number}_${subject.id}" }) { subject ->
+                                val index = stream.subjects.indexOfFirst { it.id == subject.id }.coerceAtLeast(0)
+                                SubjectChoiceCard(
+                                    name = subject.name,
+                                    checked = subject.id in state.selectedIds,
+                                    enabled = true,
+                                    compulsory = group.isCompulsory,
+                                    palette = subjectPalettes[index % subjectPalettes.size],
+                                    onClick = { viewModel.toggle(subject.id) }
+                                )
+                            }
+                        }
+                    } else {
+                        // No groups: a plain list, up to 3 subjects
+                        itemsIndexed(stream.subjects, key = { _, subject -> subject.id }) { index, subject ->
+                            val checked = subject.id in state.selectedIds
+                            SubjectChoiceCard(
+                                name = subject.name,
+                                checked = checked,
+                                // When 3 are chosen the others are locked (a ticked one can always be unticked)
+                                enabled = checked || !state.isFull,
+                                compulsory = false,
+                                palette = subjectPalettes[index % subjectPalettes.size],
+                                onClick = { viewModel.toggle(subject.id) }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/** "Group 1" pill + "Compulsory" / "Choose one". */
+@Composable
+private fun GroupHeader(group: SubjectGroup) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(shape = CircleShape, color = NenaPrimary) {
+            Text(
+                text = "Group ${group.number}",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = if (group.isCompulsory) "Compulsory subject" else "Choose one",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -167,6 +220,7 @@ private fun SubjectChoiceCard(
     name: String,
     checked: Boolean,
     enabled: Boolean,
+    compulsory: Boolean,
     palette: IconPalette,
     onClick: () -> Unit
 ) {
@@ -211,6 +265,15 @@ private fun SubjectChoiceCard(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
             )
+
+            if (compulsory) {
+                Text(
+                    text = "Compulsory",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NenaPrimary
+                )
+            }
 
             Spacer(modifier = Modifier.width(10.dp))
 
