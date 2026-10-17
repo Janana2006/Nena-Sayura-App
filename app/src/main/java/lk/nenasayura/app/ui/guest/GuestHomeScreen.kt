@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.LibraryBooks
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FactCheck
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Quiz
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -56,6 +58,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.ui.common.NenaTopBar
+import lk.nenasayura.app.ui.student.GuestResourcesTab
+import lk.nenasayura.app.ui.student.MenuItemCard
+import lk.nenasayura.app.ui.student.GuestStudyTab
 import lk.nenasayura.app.ui.theme.IconPalette
 import lk.nenasayura.app.ui.theme.NenaAccent
 import lk.nenasayura.app.ui.theme.NenaIconColors
@@ -71,7 +76,7 @@ private data class ResourceItem(
     val onClick: () -> Unit
 )
 
-/** The four bottom tabs. Only Home is open to guests. */
+/** The four bottom tabs. Home and Resources are open to guests. */
 private enum class GuestTab(
     val label: String,
     val title: String,
@@ -81,7 +86,7 @@ private enum class GuestTab(
 ) {
     Home("Home", "Home", Icons.Filled.Home, false, ""),
     Resources(
-        "Resources", "Resources", Icons.AutoMirrored.Filled.LibraryBooks, true,
+        "Resources", "Resources", Icons.AutoMirrored.Filled.LibraryBooks, false,
         "all your study resources in one place"
     ),
     Study(
@@ -96,7 +101,7 @@ private enum class GuestTab(
 
 /**
  * Home page for users who are not logged in.
- * Home shows the free resources; Resources, Study and Profile ask the guest to log in.
+ * Home shows the free resources; Study and Profile ask the guest to log in.
  */
 @Composable
 fun GuestHomeScreen(
@@ -161,15 +166,56 @@ fun GuestHomeScreen(
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                     }
+
+                    // Student-only cards, shown locked: tap -> login page
+                    Spacer(modifier = Modifier.height(12.dp))
+                    SectionTitle(title = "For you", subtitle = "")
+                    Spacer(modifier = Modifier.height(12.dp))
+                    MenuItemCard(
+                        title = "My teacher",
+                        subtitle = "Choose a teacher to get notes, model papers and videos",
+                        icon = Icons.Filled.School,
+                        onClick = onLogin,
+                        palette = NenaIconColors.Teacher,
+                        locked = true
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    MenuItemCard(
+                        title = "Study progress",
+                        subtitle = "See how your quizzes and study time are going",
+                        icon = Icons.Filled.BarChart,
+                        onClick = onLogin,
+                        palette = NenaIconColors.Progress,
+                        locked = true
+                    )
                 }
             }
         } else {
-            GuestLockedTab(
-                featureName = selectedTab.title,
-                benefit = selectedTab.benefit,
-                onLogin = onLogin,
-                modifier = Modifier.padding(innerPadding)
-            )
+            when (selectedTab) {
+                // Free for guests -> opens the real screens
+                GuestTab.Resources -> GuestResourcesTab(
+                    onOpenPapers = onOpenPapers,
+                    onOpenMarkingSchemes = onOpenMarkingSchemes,
+                    onOpenQuizzes = onOpenQuizzes,
+                    onOpenGuideBooks = onOpenGuideBooks,
+                    onOpenSearch = onOpenSearch,
+                    modifier = Modifier.padding(innerPadding)
+                )
+                GuestTab.Study -> GuestStudyTab(
+                    onLogin = onLogin,
+                    modifier = Modifier.padding(innerPadding)
+                )
+                GuestTab.Profile -> GuestProfileTab(
+                    onLogin = onLogin,
+                    modifier = Modifier.padding(innerPadding)
+                )
+                else -> GuestLockedTab(
+                    featureName = selectedTab.title,
+                    benefit = selectedTab.benefit,
+                    onLogin = onLogin,
+                    modifier = Modifier.padding(innerPadding)
+                )
+            }
         }
     }
 }
