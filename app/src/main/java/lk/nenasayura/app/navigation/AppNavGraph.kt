@@ -409,7 +409,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         composable(Routes.TIMETABLE) {
             TimetableScreen(
                 onBack = { navController.popBackStack() },
-                onSetup = { navController.navigate(Routes.TIMETABLE_SETUP) }
+                onSetup = { navController.navigate(Routes.TIMETABLE_SETUP) },
+                onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
             )
         }
         composable(Routes.TIMETABLE_SETUP) {
