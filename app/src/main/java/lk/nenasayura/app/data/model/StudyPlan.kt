@@ -107,11 +107,13 @@ data class StudySession(
     val subjectId: String = "",
     val subjectName: String = "",
     val kind: SessionKind = SessionKind.CUSTOM,
-    /** "paper", "marking_scheme", "guide_book", "quiz", "teacher_content", or "" for none. */
+    /** One of [ResourceTypes], or "" when the session has no resource. */
     val resourceType: String = "",
     val resourceId: String = "",
     /** Title saved for display, so the list does not need extra reads. */
     val resourceTitle: String = "",
+    /** The file or video link, saved so a session opens without extra reads ("" for quizzes). */
+    val resourceUrl: String = "",
     val status: SessionStatus = SessionStatus.PLANNED,
     /** The day it was planned for before the student moved it ("" = never moved). */
     val originalDate: String = "",
@@ -119,4 +121,15 @@ data class StudySession(
 ) {
     val localDate: LocalDate get() = LocalDate.parse(date)
     val wasMoved: Boolean get() = originalDate.isNotBlank()
+}
+
+
+/** The kinds of resource a session can point to. */
+object ResourceTypes {
+    const val PAPER = "paper"
+    const val MARKING_SCHEME = "marking_scheme"
+    const val GUIDE_BOOK = "guide_book"
+    const val QUIZ = "quiz"
+    const val TEACHER_FILE = "teacher_file"   // a teacher's note, tute or model paper
+    const val TEACHER_VIDEO = "teacher_video" // a teacher's video link
 }

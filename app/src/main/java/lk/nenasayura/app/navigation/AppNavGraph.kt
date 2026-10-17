@@ -52,6 +52,7 @@ import lk.nenasayura.app.ui.student.teachercontent.TeacherListScreen
 import lk.nenasayura.app.ui.student.teachercontent.TeacherMaterialsScreen
 import lk.nenasayura.app.ui.student.teachercontent.TeacherPaymentScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
+import lk.nenasayura.app.ui.student.progress.StudyProgressScreen
 import lk.nenasayura.app.ui.student.timetable.PlannerSetupScreen
 import lk.nenasayura.app.ui.student.timetable.TimetableScreen
 
@@ -530,7 +531,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
         composable(Routes.TIMETABLE) {
             TimetableScreen(
                 onBack = { navController.popBackStack() },
-                onSetup = { navController.navigate(Routes.TIMETABLE_SETUP) }
+                onSetup = { navController.navigate(Routes.TIMETABLE_SETUP) },
+                onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
             )
         }
         composable(Routes.TIMETABLE_SETUP) {
@@ -541,7 +543,17 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
         placeholder(Routes.REMINDERS, "Reminders", navController)
-        placeholder(Routes.ANALYTICS, "Study Analytics", navController)
+        composable(Routes.ANALYTICS) {
+            if (session.isStudent) {
+                StudyProgressScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
+                    onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
+                )
+            } else {
+                FeaturePlaceholderScreen(title = "Study Progress", onBack = { navController.popBackStack() })
+            }
+        }
     }
 }
 

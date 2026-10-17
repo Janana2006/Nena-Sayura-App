@@ -13,7 +13,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import lk.nenasayura.app.core.session.AppSession
+import lk.nenasayura.app.core.session.UserSession
+import lk.nenasayura.app.core.session.isStudent
+import lk.nenasayura.app.data.model.AttemptAnswer
+import lk.nenasayura.app.data.model.QuizAttempt
 import lk.nenasayura.app.data.model.QuizQuestion
+import lk.nenasayura.app.data.repository.QuizAttemptRepository
 import lk.nenasayura.app.data.repository.QuizRepository
 
 /** State of one quiz attempt: the questions, the answers so far, and whether it is finished. */
@@ -21,6 +27,7 @@ data class QuizUiState(
     val isLoading: Boolean = true,
     val errorMessage: String? = null,
     val quizTitle: String = "",
+    val subjectId: String = "",
     val questions: List<QuizQuestion> = emptyList(),
     val currentIndex: Int = 0,
     /** question index -> chosen option index */
@@ -43,6 +50,10 @@ class QuizViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
 
     private val quizId: String = savedStateHandle.get<String>("quizId") ?: ""
     private val quizRepository = QuizRepository()
+    private val attemptRepository = QuizAttemptRepository()
+
+    /** Stops one finished attempt from being saved twice. */
+    private var attemptSaved = false
 
     private val _uiState = MutableStateFlow(QuizUiState())
     val uiState: StateFlow<QuizUiState> = _uiState.asStateFlow()
@@ -64,6 +75,7 @@ class QuizViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     it.copy(
                         isLoading = false,
                         quizTitle = quiz?.title ?: "Quiz",
+                        subjectId = quiz?.subjectId ?: "",
                         questions = questions
                     )
                 }
@@ -99,21 +111,67 @@ class QuizViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     }
 
     /** Goes to the next question, or submits the quiz after the last one. */
-    fun next() = _uiState.update { state ->
+    fun next() {
+        val state = _uiState.value
+        if (state.isFinished) return
         if (state.isLastQuestion) {
-            state.copy(isFinished = true)
+            _uiState.update { it.copy(isFinished = true) }
+            saveAttempt(state)
         } else {
-            state.copy(currentIndex = state.currentIndex + 1)
+            _uiState.update { it.copy(currentIndex = it.currentIndex + 1) }
+        }
+    }
+
+    /**
+     * Saves the finished attempt for the Study Progress screen.
+     * Only logged-in students are tracked; guests are skipped.
+     */
+    private fun saveAttempt(state: QuizUiState) {
+        if (attemptSaved || state.questions.isEmpty()) return
+        val session = AppSession.provider.session.value
+        if (!session.isStudent) return
+        val uid = (session as UserSession.LoggedIn).uid
+        attemptSaved = true
+
+        val attempt = QuizAttempt(
+            quizId = quizId,
+            quizTitle = state.quizTitle,
+            subjectId = state.subjectId,
+            score = state.score,
+            total = state.questions.size,
+            answers = state.questions.mapIndexed { index, question ->
+                val selected = state.selectedAnswers[index] ?: -1
+                AttemptAnswer(
+                    questionId = question.id,
+                    selectedIndex = selected,
+                    correct = selected == question.correctIndex
+                )
+            },
+            createdAtMillis = System.currentTimeMillis()
+        )
+
+        viewModelScope.launch {
+            try {
+                attemptRepository.saveAttempt(uid, attempt)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not critical: the quiz result is still shown. Let the next attempt try again.
+                attemptSaved = false
+            }
         }
     }
 
     /** Starts the same quiz again from the first question. */
-    fun restart() = _uiState.update {
-        it.copy(
-            currentIndex = 0,
-            selectedAnswers = emptyMap(),
-            checkedQuestions = emptySet(),
-            isFinished = false
-        )
+    fun restart() {
+        attemptSaved = false
+        _uiState.update {
+            it.copy(
+                currentIndex = 0,
+                selectedAnswers = emptyMap(),
+                checkedQuestions = emptySet(),
+                isFinished = false
+            )
+        }
     }
 }

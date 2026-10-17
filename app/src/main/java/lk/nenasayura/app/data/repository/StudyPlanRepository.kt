@@ -141,6 +141,7 @@ class StudyPlanRepository(
         "resourceType" to resourceType,
         "resourceId" to resourceId,
         "resourceTitle" to resourceTitle,
+        "resourceUrl" to resourceUrl,
         "status" to status.key,
         "originalDate" to originalDate,
         "completedAtMillis" to completedAtMillis
@@ -159,6 +160,7 @@ class StudyPlanRepository(
             resourceType = getString("resourceType") ?: "",
             resourceId = getString("resourceId") ?: "",
             resourceTitle = getString("resourceTitle") ?: "",
+            resourceUrl = getString("resourceUrl") ?: "",
             status = SessionStatus.fromKey(getString("status")),
             originalDate = getString("originalDate") ?: "",
             completedAtMillis = getLong("completedAtMillis") ?: 0L

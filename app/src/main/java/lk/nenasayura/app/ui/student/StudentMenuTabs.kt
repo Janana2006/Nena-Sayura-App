@@ -66,7 +66,7 @@ fun StudentStudyTab(actions: StudentHomeActions, modifier: Modifier = Modifier) 
         MenuItemCard("Teachers", "Notes, tutes, papers and videos from teachers", Icons.Filled.School, actions.onOpenTeachers, palette = NenaIconColors.Teacher)
         MenuItemCard("Timetable", "Your weekly classes and study times", Icons.Filled.CalendarMonth, actions.onOpenTimetable, palette = NenaIconColors.Timetable)
         MenuItemCard("Reminders", "Study, exam and revision reminders", Icons.Filled.Notifications, actions.onOpenReminders, palette = NenaIconColors.Reminders)
-        MenuItemCard("Study Analytics", "Track your quiz results and progress", Icons.Filled.BarChart, actions.onOpenAnalytics, palette = NenaIconColors.Progress)
+        MenuItemCard("Study Progress", "See how you are doing in each subject", Icons.Filled.BarChart, actions.onOpenAnalytics, palette = NenaIconColors.Progress)
     }
 }
 
