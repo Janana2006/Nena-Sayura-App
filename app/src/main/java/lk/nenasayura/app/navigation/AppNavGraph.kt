@@ -47,8 +47,6 @@ import lk.nenasayura.app.ui.student.papers.SubjectSelectScreen
 import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
 import lk.nenasayura.app.ui.student.quizzes.QuizListScreen as StudentQuizListScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import lk.nenasayura.app.core.reminders.ReminderScheduler
-import lk.nenasayura.app.ui.student.reminders.RemindersScreen
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 import lk.nenasayura.app.ui.student.teachercontent.TeacherListScreen
@@ -84,8 +82,6 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
     // Sign out kalama Login screen ekata yanawa, mehedi flag eka naha
     // nisa "Continue as Guest" button eka aye pennanawa.
     val openLoginAfterSignOut: () -> Unit = {
-        // Stop every study reminder of the student who is signing out
-        ReminderScheduler.cancelAndClearAsync(context)
         context.startActivity(Intent(context, MainActivity::class.java))
         (context as? Activity)?.finish()
     }
@@ -429,18 +425,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     }
                 }
             } else {
-                // Guests: their chosen subjects first, then the books of the chosen subject
-                if (subjectId == null) {
-                    GuideSubjectsScreen(
-                        category = category,
-                        onBack = { navController.popBackStack() },
-                        onOpenSubject = { selectedSubId ->
-                            navController.navigate(Routes.guideBooksRoute(category, selectedSubId))
-                        }
-                    )
-                } else {
-                    GuideBooksScreen(onBack = { navController.popBackStack() })
-                }
+                // Guests: the books page shows the chosen subjects as chips (no "All"), only those with books
+                GuideBooksScreen(onBack = { navController.popBackStack() })
             }
         }
 
@@ -599,12 +585,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 onFinished = { navController.popBackStack() }
             )
         }
-        composable(Routes.REMINDERS) {
-            RemindersScreen(
-                onBack = { navController.popBackStack() },
-                onOpenTimetable = { navController.navigate(Routes.TIMETABLE) }
-            )
-        }
+        placeholder(Routes.REMINDERS, "Reminders", navController)
         composable(Routes.ANALYTICS) {
             if (session.isStudent) {
                 StudyProgressScreen(

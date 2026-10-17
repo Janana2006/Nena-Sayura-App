@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import lk.nenasayura.app.core.browse.PaperBrowseSelection
 import lk.nenasayura.app.data.model.GuideBook
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.isInCategory
@@ -26,7 +27,10 @@ data class GuideBooksUiState(
     val selectedSubjectId: String? = null,
     val query: String = "",
     // Set when a student opened the books of one subject (stream -> category -> subject)
-    val fixedSubjectId: String? = null
+    val fixedSubjectId: String? = null,
+    // true = a guest chose a stream + subjects: only those subjects, no "All" chip
+    val restricted: Boolean = false,
+    val streamName: String = ""
 ) {
     fun subjectName(subjectId: String): String =
         subjects.firstOrNull { it.id == subjectId }?.name ?: ""
@@ -39,7 +43,7 @@ data class GuideBooksUiState(
         }
 
     val hasActiveFilters: Boolean
-        get() = selectedSubjectId != null || query.isNotBlank()
+        get() = (!restricted && selectedSubjectId != null) || query.isNotBlank()
 
     val filteredBooks: List<GuideBook>
         get() {
@@ -83,25 +87,35 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
                     booksJob.await() to subjectsJob.await()
                 }
 
-                // DEBUG: see this in Logcat (filter: GuideDebug). Remove after the problem is found.
-                android.util.Log.d(
-                    "GuideDebug",
-                    "category=$category subjectId=$subjectId total=${books.size} " +
-                            "categories=${books.map { it.category }} " +
-                            "bookSubjectIds=${books.map { it.subjectId }} " +
-                            "inThisCategory=${books.count { it.isInCategory(category) }} " +
-                            "inCategoryAndSubject=${books.count { it.isInCategory(category) && (subjectId == null || it.subjectId == subjectId) }}"
-                )
+                // Guests: the stream + subjects they chose (Papers, Marking Schemes, Quizzes and Guide Books share it).
+                // A student always opens one subject (subjectId is set), so this only applies to guests.
+                val selection = PaperBrowseSelection.state.value
+                val restricted = subjectId == null && selection.hasSelection
+
+                // Keep only the books of the chosen category (and the chosen subject)
+                val categoryBooks = books.filter { book ->
+                    book.isInCategory(category) &&
+                            (subjectId == null || book.subjectId == subjectId)
+                }
+                val shownBooks =
+                    if (restricted) categoryBooks.filter { it.subjectId in selection.subjectIds } else categoryBooks
+                val shownSubjects = if (restricted) selection.subjects else subjects
+
+                // Open the first chosen subject that has books (there is no "All" chip)
+                val firstWithBooks = if (restricted) {
+                    selection.subjects
+                        .firstOrNull { subject -> shownBooks.any { it.subjectId == subject.id } }
+                        ?.id
+                } else null
 
                 _uiState.update {
                     it.copy(
                         isLoading = false,
-                        // Keep only the books of the chosen category (and the chosen subject)
-                        books = books.filter { book ->
-                            book.isInCategory(category) &&
-                                    (subjectId == null || book.subjectId == subjectId)
-                        },
-                        subjects = subjects
+                        books = shownBooks,
+                        subjects = shownSubjects,
+                        restricted = restricted,
+                        streamName = if (restricted) selection.streamName else "",
+                        selectedSubjectId = firstWithBooks
                     )
                 }
             } catch (e: CancellationException) {
@@ -121,6 +135,7 @@ class GuideBooksViewModel(savedStateHandle: SavedStateHandle) : ViewModel() {
     fun onSubjectSelected(subjectId: String?) = _uiState.update { it.copy(selectedSubjectId = subjectId) }
 
     fun clearFilters() = _uiState.update {
-        it.copy(selectedSubjectId = null, query = "")
+        // With chosen subjects there is no "All", so the chosen subject stays
+        it.copy(selectedSubjectId = if (it.restricted) it.selectedSubjectId else null, query = "")
     }
 }
