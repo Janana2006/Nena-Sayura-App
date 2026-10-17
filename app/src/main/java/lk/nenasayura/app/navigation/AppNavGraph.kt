@@ -48,6 +48,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
 import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
+import lk.nenasayura.app.ui.student.progress.StudyProgressScreen
 import lk.nenasayura.app.ui.student.timetable.PlannerSetupScreen
 import lk.nenasayura.app.ui.student.timetable.TimetableScreen
 
@@ -419,7 +420,17 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             )
         }
         placeholder(Routes.REMINDERS, "Reminders", navController)
-        placeholder(Routes.ANALYTICS, "Study Analytics", navController)
+        composable(Routes.ANALYTICS) {
+            if (session.isStudent) {
+                StudyProgressScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenQuizzes = { navController.navigate(Routes.QUIZZES) },
+                    onOpenQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
+                )
+            } else {
+                FeaturePlaceholderScreen(title = "Study Progress", onBack = { navController.popBackStack() })
+            }
+        }
     }
 }
 
