@@ -90,6 +90,10 @@ data class StudyPlanSettings(
     val goal: StudyGoal = StudyGoal.MARKS,
     /** The exam date in milliseconds (0 = not set). */
     val examDateMillis: Long = 0L,
+    /** Small multipliers (0.7 to 1.5) from the weekly review: subjectId -> multiplier. */
+    val weightAdjustment: Map<String, Double> = emptyMap(),
+    /** The Monday of the last week that was reviewed, like "2026-10-05" ("" = never). */
+    val lastReviewedWeekStart: String = "",
     /** The last date that already has sessions, like "2026-11-15" (empty = no plan yet). */
     val generatedUntil: String = ""
 ) {

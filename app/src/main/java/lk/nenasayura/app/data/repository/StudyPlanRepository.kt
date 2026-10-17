@@ -54,6 +54,8 @@ class StudyPlanRepository(
             "learningStyle" to settings.learningStyle.key,
             "goal" to settings.goal.key,
             "generatedUntil" to settings.generatedUntil,
+            "weightAdjustment" to settings.weightAdjustment,
+            "lastReviewedWeekStart" to settings.lastReviewedWeekStart,
             "updatedAt" to FieldValue.serverTimestamp()
         )
         if (settings.examDateMillis > 0L) {
@@ -96,6 +98,25 @@ class StudyPlanRepository(
         planned.chunked(BATCH_SIZE).forEach { chunk ->
             val batch = db.batch()
             chunk.forEach { batch.delete(it.reference) }
+            batch.commit().await()
+        }
+    }
+
+    /**
+     * Past sessions (before [beforeDate], within the last 60 days) that were never marked become "missed",
+     * so the history is complete when the weekly review is applied.
+     */
+    suspend fun markPastPlannedAsMissed(uid: String, beforeDate: String) {
+        val fromDate = java.time.LocalDate.parse(beforeDate).minusDays(60).toString()
+        val snapshot = sessionsRef(uid)
+            .whereGreaterThanOrEqualTo("date", fromDate)
+            .whereLessThan("date", beforeDate)
+            .get()
+            .await()
+        val unmarked = snapshot.documents.filter { it.getString("status") == SessionStatus.PLANNED.key }
+        unmarked.chunked(BATCH_SIZE).forEach { chunk ->
+            val batch = db.batch()
+            chunk.forEach { batch.update(it.reference, "status", SessionStatus.MISSED.key) }
             batch.commit().await()
         }
     }
@@ -186,6 +207,12 @@ class StudyPlanRepository(
                 val mins = (value as? Number)?.toInt() ?: return@mapNotNull null
                 day to mins
             }?.toMap() ?: emptyMap()
+        val adjustment = (get("weightAdjustment") as? Map<*, *>)
+            ?.mapNotNull { (key, value) ->
+                val subjectId = key as? String ?: return@mapNotNull null
+                val multiplier = (value as? Number)?.toDouble() ?: return@mapNotNull null
+                subjectId to multiplier
+            }?.toMap() ?: emptyMap()
 
         return StudyPlanSettings(
             confidence = confidence,
@@ -196,6 +223,8 @@ class StudyPlanRepository(
             learningStyle = LearningStyle.fromKey(getString("learningStyle")),
             goal = StudyGoal.fromKey(getString("goal")),
             examDateMillis = (get("examDate") as? Timestamp)?.toDate()?.time ?: 0L,
+            weightAdjustment = adjustment,
+            lastReviewedWeekStart = getString("lastReviewedWeekStart") ?: "",
             generatedUntil = getString("generatedUntil") ?: ""
         )
     }
