@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import lk.nenasayura.app.core.planner.PlanGenerator
 import lk.nenasayura.app.core.planner.ResourceAttacher
+import lk.nenasayura.app.core.planner.WeekReview
+import lk.nenasayura.app.core.planner.WeekReviewer
 import lk.nenasayura.app.data.model.SessionKind
 import lk.nenasayura.app.data.model.SessionStatus
 import lk.nenasayura.app.data.model.StudyPlanSettings
@@ -46,7 +48,14 @@ data class TimetableUiState(
     val isGenerating: Boolean = false,
     val generateError: String? = null,
     /** A short message shown once (as a toast), for example "Session moved". */
-    val actionMessage: String? = null
+    val actionMessage: String? = null,
+    /** Last week is over and has not been reviewed yet. */
+    val reviewDue: Boolean = false,
+    val isReviewLoading: Boolean = false,
+    /** The prepared review; while it is not null the review sheet is shown. */
+    val review: WeekReview? = null,
+    val isApplyingReview: Boolean = false,
+    val reviewError: String? = null
 ) {
     val subjectNames: Map<String, String> get() = subjects.associate { it.id to it.name }
 
@@ -83,9 +92,9 @@ class TimetableViewModel : ViewModel() {
                 }
                 val settings = planRepository.getSettings(profile.uid)
                 val weekStart = _uiState.value.weekStart
-                val sessions = if (settings != null && settings.hasPlan) {
-                    fetchWeek(profile.uid, weekStart)
-                } else emptyList()
+                val hasPlan = settings != null && settings.hasPlan
+                val sessions = if (hasPlan) fetchWeek(profile.uid, weekStart) else emptyList()
+                val reviewDue = settings != null && hasPlan && isReviewDue(profile.uid, settings)
 
                 _uiState.update {
                     it.copy(
@@ -93,6 +102,7 @@ class TimetableViewModel : ViewModel() {
                         uid = profile.uid,
                         subjects = subjects,
                         settings = settings,
+                        reviewDue = reviewDue,
                         // Ignore the result if the student already moved to another week
                         weekSessions = if (it.weekStart == weekStart) sessions else it.weekSessions
                     )
@@ -273,6 +283,92 @@ class TimetableViewModel : ViewModel() {
 
     fun clearMessage() = _uiState.update { it.copy(actionMessage = null) }
 
+    // ---------- the weekly review ----------
+
+    // Due when last week (Monday to Sunday) had planned sessions and has not been reviewed yet
+    private suspend fun isReviewDue(uid: String, settings: StudyPlanSettings): Boolean {
+        val lastWeek = weekStartOf(LocalDate.now()).minusWeeks(1)
+        if (settings.lastReviewedWeekStart >= lastWeek.toString()) return false
+        return try {
+            fetchWeek(uid, lastWeek).any { it.kind != SessionKind.CUSTOM }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Looks at last week and the week before, and shows the review sheet. */
+    fun openReview() {
+        val state = _uiState.value
+        if (state.uid.isBlank() || state.isReviewLoading) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isReviewLoading = true, reviewError = null) }
+            try {
+                val lastWeek = weekStartOf(LocalDate.now()).minusWeeks(1)
+                val thisWeek = fetchWeek(state.uid, lastWeek)
+                val before = fetchWeek(state.uid, lastWeek.minusWeeks(1))
+                val review = WeekReviewer.review(lastWeek, thisWeek, before, LocalDate.now())
+                _uiState.update { it.copy(isReviewLoading = false, review = review) }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(
+                        isReviewLoading = false,
+                        actionMessage = "Could not load last week. Check your internet connection."
+                    )
+                }
+            }
+        }
+    }
+
+    fun dismissReview() = _uiState.update { it.copy(review = null, reviewError = null) }
+
+    /**
+     * Applies the review: unmarked sessions become missed, the subject weights change,
+     * the optional lighter/fuller days are applied, and the plan from tomorrow is built again
+     * with the missed sessions carried over.
+     */
+    fun applyReview(applySuggestion: Boolean) {
+        val state = _uiState.value
+        val review = state.review ?: return
+        val settings = state.settings ?: return
+        if (state.isApplyingReview || state.uid.isBlank()) return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(isApplyingReview = true, reviewError = null) }
+            try {
+                var updated = settings.copy(
+                    weightAdjustment = WeekReviewer.adjustWeights(settings.weightAdjustment, review),
+                    lastReviewedWeekStart = review.weekStart.toString()
+                )
+                if (applySuggestion) updated = WeekReviewer.adjustLoad(updated, review.suggestion)
+
+                withTimeout(GENERATE_TIMEOUT_MS) {
+                    planRepository.markPastPlannedAsMissed(state.uid, LocalDate.now().toString())
+                    rebuildPlan(state.uid, state.subjects, updated, LocalDate.now().plusDays(1), review.carryOver)
+                }
+                _uiState.update { it.copy(isApplyingReview = false, review = null) }
+                load()
+            } catch (e: TimeoutCancellationException) {
+                _uiState.update {
+                    it.copy(
+                        isApplyingReview = false,
+                        reviewError = "Could not reach the server. Check your internet connection and try again."
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _uiState.update {
+                    it.copy(isApplyingReview = false, reviewError = "Could not update your plan. Please try again.")
+                }
+            }
+        }
+    }
+
     // ---------- generating ----------
 
     /**
@@ -287,22 +383,9 @@ class TimetableViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.update { it.copy(isGenerating = true, generateError = null) }
             try {
-                val startDate = LocalDate.now().plusDays(1)
-                val generatedUntil = PlanGenerator.horizonEnd(startDate).minusDays(1).toString()
-
                 // Reading the resources and several writes, so a longer timeout than a single save
                 withTimeout(GENERATE_TIMEOUT_MS) {
-                    val pool = resourceRepository.loadPool(state.uid, state.subjects.map { it.id }.toSet())
-                    val completed = resourceRepository.getCompletedKeys(state.uid)
-                    val sessions = ResourceAttacher.attach(
-                        PlanGenerator.generate(settings, state.subjects, startDate, seed = state.uid),
-                        pool,
-                        completed
-                    )
-
-                    planRepository.deletePlannedFrom(state.uid, startDate.toString())
-                    planRepository.addSessions(state.uid, sessions)
-                    planRepository.saveSettings(state.uid, settings.copy(generatedUntil = generatedUntil))
+                    rebuildPlan(state.uid, state.subjects, settings, LocalDate.now().plusDays(1), emptyList())
                 }
                 _uiState.update { it.copy(isGenerating = false) }
                 load()
@@ -321,6 +404,29 @@ class TimetableViewModel : ViewModel() {
                 }
             }
         }
+    }
+
+    // Builds the sessions from [startDate] on, attaches resources, and saves everything
+    private suspend fun rebuildPlan(
+        uid: String,
+        subjects: List<Subject>,
+        settings: StudyPlanSettings,
+        startDate: LocalDate,
+        carryOver: List<StudySession>
+    ) {
+        val generatedUntil = PlanGenerator.horizonEnd(startDate).minusDays(1).toString()
+        val pool = resourceRepository.loadPool(uid, subjects.map { it.id }.toSet())
+        val completed = resourceRepository.getCompletedKeys(uid)
+        val sessions = ResourceAttacher.attach(
+            PlanGenerator.generate(settings, subjects, startDate, seed = uid),
+            pool,
+            completed,
+            carryOver
+        )
+
+        planRepository.deletePlannedFrom(uid, startDate.toString())
+        planRepository.addSessions(uid, sessions)
+        planRepository.saveSettings(uid, settings.copy(generatedUntil = generatedUntil))
     }
 
     private companion object {

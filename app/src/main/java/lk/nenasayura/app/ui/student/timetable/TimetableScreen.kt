@@ -164,6 +164,7 @@ fun TimetableScreen(
                 },
                 onOpenResource = { session -> openSessionResource(context, session, onOpenQuiz) },
                 onAddSession = { showAdd = true },
+                onOpenReview = viewModel::openReview,
                 modifier = modifier
             )
         }
@@ -230,6 +231,15 @@ fun TimetableScreen(
             }
         )
     }
+    state.review?.let { review ->
+        WeeklyReviewSheet(
+            review = review,
+            isApplying = state.isApplyingReview,
+            error = state.reviewError,
+            onApply = viewModel::applyReview,
+            onDismiss = viewModel::dismissReview
+        )
+    }
 }
 
 @Composable
@@ -244,9 +254,17 @@ private fun TimetableBody(
     onToggleDone: (StudySession) -> Unit,
     onOpenResource: (StudySession) -> Unit,
     onAddSession: () -> Unit,
+    onOpenReview: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.fillMaxSize()) {
+        if (state.reviewDue) {
+            ReviewBanner(
+                isLoading = state.isReviewLoading,
+                onOpen = onOpenReview,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+            )
+        }
         ViewToggle(mode = state.viewMode, onChange = onViewMode)
         WeekNavigator(
             days = state.weekDays,
