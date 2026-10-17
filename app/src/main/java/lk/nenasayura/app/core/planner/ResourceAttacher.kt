@@ -59,10 +59,17 @@ object ResourceAttacher {
      * @param completedKeys resources already finished in earlier plans, as "type:id"
      *                      (for example "quiz:abc"); they are used last
      */
+    /**
+     * @param completedKeys resources already finished in earlier plans, as "type:id"
+     *                      (for example "quiz:abc"); they are used last
+     * @param carryOver     sessions missed last week; each one is planned again, with the same resource,
+     *                      in the first session of the same subject
+     */
     fun attach(
         sessions: List<StudySession>,
         pool: ResourcePool,
-        completedKeys: Set<String> = emptySet()
+        completedKeys: Set<String> = emptySet(),
+        carryOver: List<StudySession> = emptyList()
     ): List<StudySession> {
         val refsBySubject = HashMap<String, SubjectRefs>()
         val used = completedKeys.toMutableSet()          // planned or already done
@@ -70,8 +77,34 @@ object ResourceAttacher {
         val lastPaper = HashMap<String, Paper>()         // subjectId -> latest paper planned
         val learned = HashMap<String, MutableList<Ref>>() // subjectId -> notes/videos/books planned
 
+        // Carried-over resources count as used, so other sessions do not take them first
+        val carryBySubject = carryOver
+            .filter { it.kind != SessionKind.CUSTOM }
+            .groupBy { it.subjectId }
+            .mapValues { ArrayDeque(it.value) }
+        carryOver
+            .filter { it.resourceId.isNotBlank() }
+            .forEach { used.add("${it.resourceType}:${it.resourceId}") }
+
         return sessions.map { session ->
             if (session.kind == SessionKind.CUSTOM) return@map session
+
+            // A missed session from last week takes the first free session of its subject
+            val carried = carryBySubject[session.subjectId]?.removeFirstOrNull()
+            if (carried != null) {
+                if (carried.resourceId.isNotBlank() && carried.kind in LEARNING_KINDS) {
+                    val ref = Ref(carried.resourceType, carried.resourceId, carried.resourceTitle, carried.resourceUrl, carried.kind)
+                    learned.getOrPut(session.subjectId) { mutableListOf() }.add(ref)
+                }
+                return@map session.copy(
+                    kind = carried.kind,
+                    resourceType = carried.resourceType,
+                    resourceId = carried.resourceId,
+                    resourceTitle = carried.resourceTitle,
+                    resourceUrl = carried.resourceUrl,
+                    originalDate = carried.date
+                )
+            }
 
             val refs = refsBySubject.getOrPut(session.subjectId) { buildRefs(pool, session.subjectId) }
             val learnedRefs = learned[session.subjectId].orEmpty()
@@ -87,7 +120,7 @@ object ResourceAttacher {
             used.add(ref.key)
             timesPlanned[ref.key] = (timesPlanned[ref.key] ?: 0) + 1
             ref.paper?.let { lastPaper[session.subjectId] = it }
-            if (ref.kind == SessionKind.LEARN_VIDEO || ref.kind == SessionKind.LEARN_NOTE || ref.kind == SessionKind.LEARN_BOOK) {
+            if (ref.kind in LEARNING_KINDS) {
                 learned.getOrPut(session.subjectId) { mutableListOf() }.add(ref)
             }
 
@@ -186,6 +219,7 @@ object ResourceAttacher {
     }
 
     private val NOTE_TYPES = listOf(ContentType.SHORT_NOTE, ContentType.NOTE, ContentType.TUTE)
+    private val LEARNING_KINDS = setOf(SessionKind.LEARN_VIDEO, SessionKind.LEARN_NOTE, SessionKind.LEARN_BOOK)
 
     private fun paperRank(type: String): Int = when (normalizedType(type)) {
         "past" -> 0

@@ -100,7 +100,11 @@ object PlanGenerator {
         return count * length + breaks + if (withFlex) FLEX_MINUTES else 0
     }
 
-    private fun sessionsThatFit(dayMinutes: Int, length: Int): Int {
+    /** The day length (in minutes) that exactly fits [count] sessions of [length]. */
+    fun minutesNeeded(count: Int, length: Int): Int = minutesUsed(count, length, withFlex = true)
+
+    /** How many sessions of [length] fit into a day of [dayMinutes] (with breaks and the flex time). */
+    fun sessionsThatFit(dayMinutes: Int, length: Int): Int {
         var count = 0
         while (minutesUsed(count + 1, length, withFlex = true) <= dayMinutes) count++
         // A day that fits one session but not the flex time still gets that session
@@ -153,7 +157,9 @@ object PlanGenerator {
         settings: StudyPlanSettings,
         seed: String
     ): List<Subject> {
-        val weight = subjects.associate { it.id to Confidence.fromLevel(settings.confidence[it.id]).weight }
+        val weight = subjects.associate {
+            it.id to Confidence.fromLevel(settings.confidence[it.id]).weight * (settings.weightAdjustment[it.id] ?: 1.0)
+        }
         val totalWeight = weight.values.sum()
         // A tiny starting credit from the seed makes different students start differently
         val credit = subjects.associate { it.id to tieBreaker(seed, it.id) }.toMutableMap()

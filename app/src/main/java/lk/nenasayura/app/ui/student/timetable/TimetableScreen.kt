@@ -1,55 +1,56 @@
 package lk.nenasayura.app.ui.student.timetable
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import lk.nenasayura.app.data.model.Confidence
-import lk.nenasayura.app.data.model.StudyPlanSettings
+import lk.nenasayura.app.data.model.SessionStatus
 import lk.nenasayura.app.data.model.StudySession
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-import androidx.compose.foundation.clickable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material3.Icon
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.platform.LocalContext
-import lk.nenasayura.app.ui.theme.NenaPrimary
+import lk.nenasayura.app.core.reminders.ReminderSyncWorker
 
 /**
- * The student's Timetable: the generate button, the planned sessions by day,
- * and the saved plan settings. (Day and Week views come in a later stage.)
+ * The student's Timetable: Day and Week views, progress, and the session actions.
+ * Before the first timetable exists it shows the generate card instead.
  */
 @Composable
 fun TimetableScreen(
@@ -57,16 +58,61 @@ fun TimetableScreen(
     onSetup: () -> Unit,
     onOpenQuiz: (quizId: String) -> Unit,
     viewModel: TimetableViewModel = viewModel()
-)  {
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val errorMessage = state.errorMessage
     val settings = state.settings
 
-    // Loads when the screen opens, and again after coming back from the setup
+    var openSessionId by remember { mutableStateOf<String?>(null) }
+    var movingSession by remember { mutableStateOf<StudySession?>(null) }
+    var showOptions by remember { mutableStateOf(false) }
+    var showAdd by remember { mutableStateOf(false) }
+    var generateRequested by remember { mutableStateOf(false) }
+
+    // Loads when the screen opens, and again after coming back from the setup or a resource
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.load() }
+    // When the student leaves the Timetable, refresh the reminders (does nothing if reminders are off)
+    LifecycleEventEffect(Lifecycle.Event.ON_PAUSE) { ReminderSyncWorker.syncNow(context) }
+
+    // Short messages ("Moved to Tuesday...") appear once as a toast
+    LaunchedEffect(state.actionMessage) {
+        state.actionMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearMessage()
+        }
+    }
+
+    // Close the plan options after a successful Regenerate
+    LaunchedEffect(state.isGenerating) {
+        if (generateRequested && !state.isGenerating) {
+            generateRequested = false
+            if (state.generateError == null) showOptions = false
+        }
+    }
+
+    val onGenerate = {
+        generateRequested = true
+        viewModel.generate()
+    }
 
     Scaffold(
-        topBar = { NenaTopBar(title = "Timetable", onBack = onBack) },
+        topBar = {
+            NenaTopBar(
+                title = "Timetable",
+                onBack = onBack,
+                actions = {
+                    if (settings?.hasPlan == true) {
+                        IconButton(onClick = { showAdd = true }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Add my own session")
+                        }
+                        IconButton(onClick = { showOptions = true }) {
+                            Icon(Icons.Filled.Settings, contentDescription = "Plan options")
+                        }
+                    }
+                }
+            )
+        },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
         val modifier = Modifier.padding(innerPadding)
@@ -87,274 +133,249 @@ fun TimetableScreen(
                 onAction = onSetup
             )
 
-            else -> TimetableContent(
-                state = state,
+            // Settings saved, but no timetable generated yet
+            !settings.hasPlan -> PlanOptionsContent(
                 settings = settings,
-                onGenerate = viewModel::generate,
+                subjectNames = state.subjectNames,
+                isGenerating = state.isGenerating,
+                error = state.generateError,
+                onGenerate = onGenerate,
                 onEdit = onSetup,
-                onOpenQuiz = onOpenQuiz,
+                modifier = modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp)
+            )
+
+            else -> TimetableBody(
+                state = state,
+                onViewMode = viewModel::setViewMode,
+                onShiftWeek = viewModel::shiftWeek,
+                onToday = viewModel::goToToday,
+                onSelectDate = viewModel::selectDate,
+                onOpenDay = { date ->
+                    viewModel.selectDate(date)
+                    viewModel.setViewMode(TimetableView.DAY)
+                },
+                onOpenSession = { openSessionId = it.id },
+                onToggleDone = { session ->
+                    val next = if (session.status == SessionStatus.DONE) SessionStatus.PLANNED else SessionStatus.DONE
+                    viewModel.setStatus(session, next)
+                },
+                onOpenResource = { session -> openSessionResource(context, session, onOpenQuiz) },
+                onAddSession = { showAdd = true },
+                onOpenReview = viewModel::openReview,
                 modifier = modifier
             )
         }
     }
+
+    // ---------- sheets and dialogs ----------
+
+    val openSession = state.weekSessions.firstOrNull { it.id == openSessionId }
+    if (openSession != null) {
+        SessionSheet(
+            session = openSession,
+            onDismiss = { openSessionId = null },
+            onOpenResource = { openSessionResource(context, openSession, onOpenQuiz) },
+            onSetStatus = { status ->
+                viewModel.setStatus(openSession, status)
+                openSessionId = null
+            },
+            onMove = {
+                movingSession = openSession
+                openSessionId = null
+            },
+            onDelete = {
+                viewModel.deleteSession(openSession)
+                openSessionId = null
+            }
+        )
+    }
+
+    movingSession?.let { session ->
+        val sessionDate = LocalDate.parse(session.date)
+        PlannerDatePickerDialog(
+            initialDate = if (sessionDate.isBefore(LocalDate.now())) LocalDate.now() else sessionDate,
+            onDismiss = { movingSession = null },
+            onDateSelected = { date ->
+                viewModel.moveSession(session, date)
+                movingSession = null
+            }
+        )
+    }
+
+    if (showOptions && settings != null) {
+        PlanOptionsSheet(
+            settings = settings,
+            subjectNames = state.subjectNames,
+            isGenerating = state.isGenerating,
+            error = state.generateError,
+            onGenerate = onGenerate,
+            onEdit = {
+                showOptions = false
+                onSetup()
+            },
+            onDismiss = { showOptions = false }
+        )
+    }
+
+    if (showAdd && settings != null) {
+        AddSessionDialog(
+            subjects = state.subjects,
+            initialDate = state.selectedDate,
+            onDismiss = { showAdd = false },
+            onAdd = { title, subject, date, minutes ->
+                viewModel.addCustomSession(title, subject, date, minutes)
+                showAdd = false
+            }
+        )
+    }
+    state.review?.let { review ->
+        WeeklyReviewSheet(
+            review = review,
+            isApplying = state.isApplyingReview,
+            error = state.reviewError,
+            onApply = viewModel::applyReview,
+            onDismiss = viewModel::dismissReview
+        )
+    }
 }
 
 @Composable
-private fun TimetableContent(
+private fun TimetableBody(
     state: TimetableUiState,
-    settings: StudyPlanSettings,
-    onGenerate: () -> Unit,
-    onEdit: () -> Unit,
-    onOpenQuiz: (String) -> Unit,
+    onViewMode: (TimetableView) -> Unit,
+    onShiftWeek: (Int) -> Unit,
+    onToday: () -> Unit,
+    onSelectDate: (LocalDate) -> Unit,
+    onOpenDay: (LocalDate) -> Unit,
+    onOpenSession: (StudySession) -> Unit,
+    onToggleDone: (StudySession) -> Unit,
+    onOpenResource: (StudySession) -> Unit,
+    onAddSession: () -> Unit,
+    onOpenReview: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val sessionsByDay = state.sessions.groupBy { it.date }
-
-    LazyColumn(
-        modifier = modifier,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item(key = "generate") {
-            GenerateCard(
-                settings = settings,
-                isGenerating = state.isGenerating,
-                error = state.generateError,
-                onGenerate = onGenerate,
-                onEdit = onEdit
+    Column(modifier = modifier.fillMaxSize()) {
+        if (state.reviewDue) {
+            ReviewBanner(
+                isLoading = state.isReviewLoading,
+                onOpen = onOpenReview,
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
             )
         }
+        ViewToggle(mode = state.viewMode, onChange = onViewMode)
+        WeekNavigator(
+            days = state.weekDays,
+            showToday = state.selectedDate != LocalDate.now(),
+            onPrevious = { onShiftWeek(-1) },
+            onNext = { onShiftWeek(1) },
+            onToday = onToday
+        )
+        WeekProgress(
+            done = state.doneCount,
+            missed = state.missedCount,
+            total = state.weekSessions.size
+        )
 
-        if (sessionsByDay.isNotEmpty()) {
-            item(key = "heading") {
-                Text(
-                    text = "Your next weeks",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            sessionsByDay.forEach { (date, daySessions) ->
-                item(key = date) {
-                    DayCard(
-                        date = date,
-                        sessions = daySessions,
-                        onOpen = { session -> openSessionResource(context, session, onOpenQuiz) }
-                    )
-                }
-            }
-        } else if (settings.hasPlan) {
-            item(key = "empty") {
-                Text(
-                    text = "No sessions are planned from today. Check your exam date, or regenerate your timetable.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        when {
+            state.isWeekLoading -> LoadingView()
 
-        item(key = "settings") {
-            SettingsCard(settings = settings, subjectNames = state.subjectNames)
+            state.viewMode == TimetableView.DAY -> DayView(
+                state = state,
+                onSelectDate = onSelectDate,
+                onOpenSession = onOpenSession,
+                onToggleDone = onToggleDone,
+                onOpenResource = onOpenResource,
+                onAddSession = onAddSession,
+                modifier = Modifier.weight(1f)
+            )
+
+            else -> WeekView(
+                state = state,
+                onOpenDay = onOpenDay,
+                onOpenSession = onOpenSession,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
 
 @Composable
-private fun GenerateCard(
-    settings: StudyPlanSettings,
-    isGenerating: Boolean,
-    error: String?,
-    onGenerate: () -> Unit,
-    onEdit: () -> Unit
+private fun ViewToggle(mode: TimetableView, onChange: (TimetableView) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        FilterChip(
+            selected = mode == TimetableView.DAY,
+            onClick = { onChange(TimetableView.DAY) },
+            label = { Text("Day") }
+        )
+        Spacer(modifier = Modifier.padding(horizontal = 4.dp))
+        FilterChip(
+            selected = mode == TimetableView.WEEK,
+            onClick = { onChange(TimetableView.WEEK) },
+            label = { Text("Week") }
+        )
+    }
+}
+
+@Composable
+private fun WeekNavigator(
+    days: List<LocalDate>,
+    showToday: Boolean,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit,
+    onToday: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = if (settings.hasPlan) "Your study timetable" else "Ready to build your timetable",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (settings.hasPlan) {
-                    "Planned until ${formatDay(settings.generatedUntil)}. Regenerating replaces the planned " +
-                            "sessions from tomorrow; done and missed ones stay."
-                } else {
-                    "Nena Sayura will plan the next 4 weeks from your settings, starting tomorrow."
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-
-            if (error != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            Button(
-                onClick = onGenerate,
-                enabled = !isGenerating,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                if (isGenerating) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(if (settings.hasPlan) "Regenerate timetable" else "Generate my timetable")
-                }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onEdit,
-                enabled = !isGenerating,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp)
-            ) {
-                Text("Edit settings")
-            }
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous week")
         }
-    }
-}
-
-@Composable
-private fun DayCard(date: String, sessions: List<StudySession>, onOpen: (StudySession) -> Unit) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = formatDay(date),
+                text = "${formatShortDate(days.first())} - ${formatShortDate(days.last())}",
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
-            sessions.forEach { session ->
-                val hasResource = session.resourceId.isNotBlank()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpen(session) },
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        text = "${formatClock(session.startMinute)} - ${formatClock(session.startMinute + session.durationMinutes)}",
-                        modifier = Modifier.width(132.dp),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = session.subjectName,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = session.kind.label,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Text(
-                            text = if (hasResource) session.resourceTitle else "No resource yet - self-study",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (hasResource) NenaPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (hasResource) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                            contentDescription = "Open resource",
-                            modifier = Modifier.size(18.dp),
-                            tint = NenaPrimary
-                        )
-                    }
-                }
+            if (showToday) {
+                TextButton(onClick = onToday) { Text("Go to today") }
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
-    }
-}
-
-@Composable
-private fun SettingsCard(settings: StudyPlanSettings, subjectNames: Map<String, String>) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(
-                text = "Your plan settings",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            InfoRow(
-                label = "Subjects",
-                value = settings.confidence.entries.joinToString("\n") { (id, level) ->
-                    "${subjectNames[id] ?: id}: ${Confidence.fromLevel(level).label}"
-                }
-            )
-            InfoRow(
-                label = "Study days",
-                value = settings.availableDays.joinToString("\n") { day ->
-                    "${fullDayName(day)}: ${formatDuration(settings.dailyMinutes[day] ?: 0)}"
-                }
-            )
-            InfoRow(
-                label = "Preferred time",
-                value = "${settings.preferredWindow.label}, from ${formatClock(settings.preferredWindow.startMinute)}"
-            )
-            InfoRow(label = "Session length", value = "${settings.sessionMinutes} min")
-            InfoRow(label = "Exam", value = examText(settings.examDateMillis))
-            InfoRow(label = "Learning style", value = settings.learningStyle.label)
-            InfoRow(label = "Goal", value = settings.goal.label)
+        IconButton(onClick = onNext) {
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next week")
         }
     }
 }
 
 @Composable
-private fun InfoRow(label: String, value: String) {
-    Column {
+private fun WeekProgress(done: Int, missed: Int, total: Int) {
+    if (total == 0) return
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
         Text(
-            text = label,
+            text = buildString {
+                append("This week: $done of $total done")
+                if (missed > 0) append("  •  $missed missed")
+            },
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Text(text = value, style = MaterialTheme.typography.bodyLarge)
+        Spacer(modifier = Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { done.toFloat() / total },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
-}
-
-/** "2026-10-19" -> "Monday, 19 Oct" */
-private fun formatDay(date: String): String =
-    LocalDate.parse(date).format(DateTimeFormatter.ofPattern("EEEE, d MMM", Locale.getDefault()))
-
-private fun examText(examDateMillis: Long): String {
-    if (examDateMillis <= 0L) return "Not set"
-    val days = daysUntilExam(examDateMillis)
-    val left = when {
-        days > 1 -> "$days days left"
-        days == 1L -> "1 day left"
-        days == 0L -> "today"
-        else -> "date has passed"
-    }
-    return "${formatExamDate(examDateMillis)} ($left)"
 }

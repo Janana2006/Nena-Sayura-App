@@ -56,6 +56,8 @@ class PlannerSetupViewModel : ViewModel() {
 
     private var uid = ""
     private var generatedUntil = ""
+    private var weightAdjustment: Map<String, Double> = emptyMap()
+    private var lastReviewedWeekStart = ""
 
     init {
         load()
@@ -74,6 +76,8 @@ class PlannerSetupViewModel : ViewModel() {
                 }
                 val existing = planRepository.getSettings(profile.uid)
                 generatedUntil = existing?.generatedUntil ?: ""
+                weightAdjustment = existing?.weightAdjustment ?: emptyMap()
+                lastReviewedWeekStart = existing?.lastReviewedWeekStart ?: ""
 
                 _uiState.update {
                     it.copy(
@@ -178,7 +182,10 @@ class PlannerSetupViewModel : ViewModel() {
             try {
                 // Without internet a write would wait forever, so give up after 15 seconds
                 withTimeout(SAVE_TIMEOUT_MS) {
-                    planRepository.saveSettings(uid, state.toSettings(generatedUntil))
+                    planRepository.saveSettings(
+                        uid,
+                        state.toSettings(generatedUntil, weightAdjustment, lastReviewedWeekStart)
+                    )
                 }
                 _uiState.update { it.copy(isSaving = false, isSaved = true) }
             } catch (e: TimeoutCancellationException) {
@@ -216,7 +223,11 @@ class PlannerSetupViewModel : ViewModel() {
         }
     }
 
-    private fun PlannerSetupUiState.toSettings(generatedUntil: String): StudyPlanSettings {
+    private fun PlannerSetupUiState.toSettings(
+        generatedUntil: String,
+        weightAdjustment: Map<String, Double>,
+        lastReviewedWeekStart: String
+    ): StudyPlanSettings {
         val days = availableDays.sorted()
         return StudyPlanSettings(
             confidence = subjects.associate { it.id to (confidence[it.id] ?: Confidence.OK.level) },
@@ -227,6 +238,8 @@ class PlannerSetupViewModel : ViewModel() {
             learningStyle = learningStyle,
             goal = goal,
             examDateMillis = examDateMillis,
+            weightAdjustment = weightAdjustment,
+            lastReviewedWeekStart = lastReviewedWeekStart,
             generatedUntil = generatedUntil
         )
     }

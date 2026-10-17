@@ -148,4 +148,13 @@ class PlanGeneratorTest {
     fun thePlanCoversFourWeeks() {
         assertEquals(monday.plusDays(28), PlanGenerator.horizonEnd(monday))
     }
+
+    @Test
+    fun aWeightAdjustmentGivesThatSubjectMoreSessions() {
+        val equal = sampleSettings(confidence = mapOf("chem" to 2, "phys" to 2, "math" to 2))
+            .copy(weightAdjustment = mapOf("chem" to 1.5))
+        val counts = plan(equal).groupingBy { it.subjectId }.eachCount()
+        assertTrue(counts.getValue("chem") > counts.getValue("phys"))
+        assertTrue(counts.getValue("chem") > counts.getValue("math"))
+    }
 }
