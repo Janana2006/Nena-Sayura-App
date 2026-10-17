@@ -18,7 +18,6 @@ import com.google.firebase.auth.FirebaseAuth
 import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
-import lk.nenasayura.app.core.browse.QuizBrowseSelection
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
@@ -42,8 +41,8 @@ import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
 import lk.nenasayura.app.ui.student.QuickAccessScreen
 import lk.nenasayura.app.ui.student.profile.ChangeStudyPage
-import lk.nenasayura.app.ui.student.quizzes.QuizStreamSelectScreen
 import lk.nenasayura.app.ui.student.quizzes.QuizSubjectSelectScreen
+import lk.nenasayura.app.ui.student.quizzes.QuizListScreen as StudentQuizListScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import lk.nenasayura.app.ui.student.reviews.AllReviewsScreen
 import lk.nenasayura.app.ui.student.reviews.WriteReviewScreen
@@ -335,20 +334,19 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 
         composable(Routes.QUIZZES) {
             if (session.isStudent) {
-                // Students: choose a stream first (this session only), then choose a subject
-                val quizBrowse by QuizBrowseSelection.state.collectAsStateWithLifecycle()
-                if (quizBrowse.hasSelection) {
+                // Students: the stream + subjects chosen at sign-up are used (same as Papers).
+                // Only the student's own subjects are shown, with a "Change" button.
+                StudentStudyGate(
+                    title = "Quizzes",
+                    onBack = { navController.popBackStack() },
+                    onChange = { navController.navigate(Routes.STUDY_EDIT) }
+                ) {
                     QuizSubjectSelectScreen(
                         onBack = { navController.popBackStack() },
-                        onChangeStream = { QuizBrowseSelection.clear() },
+                        onChangeSelection = { navController.navigate(Routes.STUDY_EDIT) },
                         onSubjectSelected = { subjectId ->
                             navController.navigate(Routes.quizzesBySubjectRoute(subjectId))
                         }
-                    )
-                } else {
-                    QuizStreamSelectScreen(
-                        onBack = { navController.popBackStack() },
-                        onStreamSelected = { stream -> QuizBrowseSelection.select(stream) }
                     )
                 }
             } else {
@@ -363,7 +361,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             route = Routes.QUIZZES_BY_SUBJECT,
             arguments = listOf(navArgument("subjectId") { type = NavType.StringType })
         ) {
-            QuizListScreen(
+            // Student version: shows only the chosen subject's quizzes
+            StudentQuizListScreen(
                 onBack = { navController.popBackStack() },
                 onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
             )

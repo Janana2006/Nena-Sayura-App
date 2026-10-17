@@ -4,9 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,15 +16,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -31,11 +31,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -46,10 +50,9 @@ import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.FilterChipRow
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
-import lk.nenasayura.app.ui.theme.NenaPrimary
-import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
+import lk.nenasayura.app.ui.theme.IconPalette
 
-/** Lists available quizzes. Guests get a subject filter; students arrive with one subject already chosen. */
+/** Lists available quizzes. Students arrive with one subject already chosen. */
 @Composable
 fun QuizListScreen(
     onBack: () -> Unit,
@@ -60,7 +63,7 @@ fun QuizListScreen(
     val errorMessage = state.errorMessage
     val visibleQuizzes = state.filteredQuizzes
 
-    // NEW: student subject ekak thorala awoth
+    // Student: the subject was chosen before
     val lockedSubjectId = viewModel.subjectId
     val topBarTitle = if (lockedSubjectId != null) {
         state.subjectName(lockedSubjectId).ifBlank { "Quizzes" }
@@ -72,7 +75,7 @@ fun QuizListScreen(
         topBar = { NenaTopBar(title = topBarTitle, onBack = onBack) },
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
@@ -90,67 +93,86 @@ fun QuizListScreen(
                     else "No quizzes are available yet."
                 )
 
-                else -> {
-                    OutlinedTextField(
-                        value = state.query,
-                        onValueChange = viewModel::onQueryChange,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        placeholder = {
-                            Text(if (lockedSubjectId != null) "Search quizzes" else "Search by title or subject")
-                        },
-                        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                        trailingIcon = {
-                            if (state.query.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.onQueryChange("") }) {
-                                    Icon(Icons.Filled.Clear, contentDescription = "Clear search")
-                                }
-                            }
-                        },
-                        singleLine = true,
-                        shape = RoundedCornerShape(14.dp)
-                    )
-
-                    // Subject filter: guests witharai (students ta subject eka kalinma thoralai)
-                    if (lockedSubjectId == null && state.availableSubjects.isNotEmpty()) {
-                        FilterChipRow(
-                            label = "Subject",
-                            options = state.availableSubjects,
-                            selected = state.availableSubjects
-                                .firstOrNull { it.id == state.selectedSubjectId },
-                            optionLabel = { it.name },
-                            onSelected = { viewModel.onSubjectSelected(it?.id) }
+                else -> LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item {
+                        QuizHero(
+                            title = "Pick a quiz",
+                            subtitle = if (state.quizzes.size == 1) "1 quiz is waiting for you"
+                            else "${state.quizzes.size} quizzes are waiting for you"
                         )
                     }
 
-                    if (visibleQuizzes.isEmpty()) {
-                        EmptyView(
-                            message = "No quizzes match your filters.",
-                            actionLabel = if (state.hasActiveFilters) "Clear filters" else null,
-                            onAction = if (state.hasActiveFilters) viewModel::clearFilters else null
+                    item {
+                        OutlinedTextField(
+                            value = state.query,
+                            onValueChange = viewModel::onQueryChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            placeholder = {
+                                Text(if (lockedSubjectId != null) "Search quizzes" else "Search by title or subject")
+                            },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (state.query.isNotEmpty()) {
+                                    IconButton(onClick = { viewModel.onQueryChange("") }) {
+                                        Icon(Icons.Filled.Clear, contentDescription = "Clear search")
+                                    }
+                                }
+                            },
+                            singleLine = true,
+                            shape = CircleShape
                         )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            item {
+                    }
+
+                    // Subject filter only when no subject was chosen before
+                    if (lockedSubjectId == null && state.availableSubjects.isNotEmpty()) {
+                        item {
+                            FilterChipRow(
+                                label = "Subject",
+                                options = state.availableSubjects,
+                                selected = state.availableSubjects
+                                    .firstOrNull { it.id == state.selectedSubjectId },
+                                optionLabel = { it.name },
+                                onSelected = { viewModel.onSubjectSelected(it?.id) }
+                            )
+                        }
+                    }
+
+                    if (visibleQuizzes.isEmpty()) {
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Text(
-                                    text = "${visibleQuizzes.size} quizzes",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = "No quizzes match your filters.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center
                                 )
+                                if (state.hasActiveFilters) {
+                                    TextButton(onClick = viewModel::clearFilters) {
+                                        Text("Clear filters")
+                                    }
+                                }
                             }
-                            items(visibleQuizzes, key = { it.id }) { quiz ->
-                                QuizCard(
-                                    quiz = quiz,
-                                    // Students ta subject eka top bar eke thiyena nisa card eke penna oni naha
-                                    subjectName = if (lockedSubjectId != null) ""
-                                    else state.subjectName(quiz.subjectId),
-                                    onStart = { onStartQuiz(quiz.id) }
-                                )
-                            }
+                        }
+                    } else {
+                        itemsIndexed(visibleQuizzes, key = { _, quiz -> quiz.id }) { index, quiz ->
+                            QuizCard(
+                                number = index + 1,
+                                quiz = quiz,
+                                palette = QuizPalettes[index % QuizPalettes.size],
+                                // The subject is already in the top bar for students
+                                subjectName = if (lockedSubjectId != null) ""
+                                else state.subjectName(quiz.subjectId),
+                                onStart = { onStartQuiz(quiz.id) }
+                            )
                         }
                     }
                 }
@@ -159,66 +181,99 @@ fun QuizListScreen(
     }
 }
 
+/** One quiz: coloured side stripe, numbered badge, title/description and a play button. */
 @Composable
-private fun QuizCard(quiz: Quiz, subjectName: String, onStart: () -> Unit) {
+private fun QuizCard(
+    number: Int,
+    quiz: Quiz,
+    palette: IconPalette,
+    subjectName: String,
+    onStart: () -> Unit
+) {
     Card(
+        onClick = onStart,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.height(IntrinsicSize.Min)) {
+            Box(
+                modifier = Modifier
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .background(palette.tint)
+            )
+
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
-                        .background(NenaPrimaryContainer, CircleShape),
+                        .size(48.dp)
+                        .background(
+                            Brush.linearGradient(
+                                listOf(palette.tint, palette.tint.copy(alpha = 0.70f))
+                            ),
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Filled.Quiz,
-                        contentDescription = null,
-                        tint = NenaPrimary
+                    Text(
+                        text = number.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
                     )
                 }
+
                 Spacer(modifier = Modifier.width(14.dp))
+
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = quiz.title,
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (subjectName.isNotBlank()) {
                         Text(
                             text = subjectName,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = palette.tint
+                        )
+                    }
+                    if (quiz.description.isNotBlank()) {
+                        Text(
+                            text = quiz.description,
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp)
                         )
                     }
                 }
-            }
 
-            if (quiz.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Text(
-                    text = quiz.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+                Spacer(modifier = Modifier.width(10.dp))
 
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                Icon(
-                    imageVector = Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Start quiz")
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(palette.container, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = "Start quiz",
+                        tint = palette.tint
+                    )
+                }
             }
         }
     }
