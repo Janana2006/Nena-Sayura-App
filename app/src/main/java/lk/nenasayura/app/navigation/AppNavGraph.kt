@@ -310,7 +310,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             val target = entry.arguments?.getString("target") ?: Routes.PAPERS
             SubjectSelectScreen(
                 onBack = { navController.popBackStack() },
-                // The choice is saved: go back to the Papers / Marking Schemes / Guide Books landing page
+                // The choice is saved: go back to the Papers / Marking Schemes / Guide Books / Quizzes landing page
                 onDone = {
                     // Guide Books reads GuideBrowseSelection: copy the new choice into it
                     GuideBrowseSelection.selectFrom(PaperBrowseSelection.state.value)
@@ -320,6 +320,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 hint = when (target) {
                     Routes.MARKING_SCHEMES -> "Marking schemes will be shown for these subjects only"
                     Routes.GUIDE_BOOKS -> "Guide books will be shown for these subjects only"
+                    Routes.QUIZZES -> "Quizzes will be shown for these subjects only"
                     else -> "Papers will be shown for these subjects only"
                 }
             )
@@ -457,11 +458,25 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     )
                 }
             } else {
-                // Guests: open all quizzes with subject filter chip
-                QuizListScreen(
-                    onBack = { navController.popBackStack() },
-                    onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) }
-                )
+                // Guests: choose stream + subjects first (this session only), then only those subjects' quizzes
+                val browse by PaperBrowseSelection.state.collectAsStateWithLifecycle()
+                if (browse.hasSelection) {
+                    QuizListScreen(
+                        onBack = { navController.popBackStack() },
+                        onStartQuiz = { quizId -> navController.navigate(Routes.quizRoute(quizId)) },
+                        onChangeSelection = {
+                            navController.navigate(Routes.guestStreamsRoute(Routes.QUIZZES))
+                        }
+                    )
+                } else {
+                    StreamSelectScreen(
+                        onBack = { navController.popBackStack() },
+                        onStreamSelected = { streamId ->
+                            navController.navigate(Routes.guestSubjectsRoute(Routes.QUIZZES, streamId))
+                        },
+                        title = "Quizzes"
+                    )
+                }
             }
         }
         composable(
@@ -598,6 +613,7 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
 private fun browseTitle(target: String): String = when (target) {
     Routes.MARKING_SCHEMES -> "Marking Schemes"
     Routes.GUIDE_BOOKS -> "Guide Books"
+    Routes.QUIZZES -> "Quizzes"
     else -> "Papers"
 }
 
