@@ -11,10 +11,21 @@ class SubjectRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
 
+    // All stream documents, sorted by "order" here in the app.
+    // NOTE: a Firestore orderBy on "order" silently drops every document that has no "order"
+    // field (for example a stream added by hand in the Firebase console), so we read all
+    // documents and sort them ourselves. Streams without "order" go to the end.
+    private suspend fun loadStreamDocuments(): List<DocumentSnapshot> =
+        db.collection(COLLECTION).get().await().documents.sortedWith(
+            compareBy<DocumentSnapshot>(
+                { (it.get("order") as? Number)?.toDouble() ?: Double.MAX_VALUE },
+                { (it.getString("name") ?: it.id).lowercase() }
+            )
+        )
+
     // Okkoma subjects (Physics wage stream 2kakama thiyena ewa ekak witharai)
     suspend fun getSubjects(): List<Subject> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
-        return snapshot.documents
+        return loadStreamDocuments()
             .flatMap { doc -> parseSubjects(doc.get("subjects"), doc.id) }
             .distinctBy { it.id }
             .sortedBy { it.name }
@@ -28,8 +39,7 @@ class SubjectRepository(
 
     // Okkoma streams (Maths Stream, Bio Stream ...) - subjects ekka
     suspend fun getStreams(): List<StudyStream> {
-        val snapshot = db.collection(COLLECTION).orderBy("order").get().await()
-        return snapshot.documents.map { it.toStream() }
+        return loadStreamDocuments().map { it.toStream() }
     }
 
     // Stream ekak (id eken). Nathnam null

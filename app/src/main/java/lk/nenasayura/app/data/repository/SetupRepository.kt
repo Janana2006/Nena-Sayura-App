@@ -1,6 +1,7 @@
 package lk.nenasayura.app.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import lk.nenasayura.app.data.model.StudyStream
@@ -13,9 +14,17 @@ class SetupRepository(
 
     // streams collection eken okkoma streams + subjects + groups
     fun getStreams(onResult: (Result<List<StudyStream>>) -> Unit) {
-        db.collection("streams").orderBy("order").get()
+        // No orderBy here: Firestore would hide every stream that has no "order" field.
+        // The streams are sorted in the app instead (streams without "order" go last).
+        db.collection("streams").get()
             .addOnSuccessListener { snapshot ->
-                val list = snapshot.documents.map { doc ->
+                val sorted = snapshot.documents.sortedWith(
+                    compareBy<DocumentSnapshot>(
+                        { (it.get("order") as? Number)?.toDouble() ?: Double.MAX_VALUE },
+                        { (it.getString("name") ?: it.id).lowercase() }
+                    )
+                )
+                val list = sorted.map { doc ->
                     val subjects = parseSubjects(doc.get("subjects"))
                     StudyStream(
                         id = doc.id,

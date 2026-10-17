@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.repository.RoleRepository
 import lk.nenasayura.app.data.repository.SetupRepository
-import lk.nenasayura.app.data.repository.StreamSeeder
 
 data class SetupUiState(
     val role: String = "student",
@@ -76,50 +75,24 @@ class SetupViewModel(
     fun loadStreams() {
         _state.update { it.copy(loading = true, error = null) }
         viewModelScope.launch {
-            if (StreamSeeder.ENABLED) {
-                try {
-                    StreamSeeder.seedMissing()
-                } catch (e: Exception) {
-                    // Ignore seeding errors
-                }
-            }
+            // Only the streams that are really in Firebase (no streams written in the code).
             repo.getStreams { result ->
                 result.fold(
                     onSuccess = { list ->
-                        val fallbackMap = StreamSeeder.getFallbackStreams().associateBy { it.id }
-                        val firestoreMap = list.associateBy { it.id }
-                        val combinedKeys = (fallbackMap.keys + firestoreMap.keys)
-                        val combined = combinedKeys.mapNotNull { id ->
-                            val fs = firestoreMap[id]
-                            val fb = fallbackMap[id]
-                            if (fs != null && fs.subjects.isNotEmpty()) {
-                                fs.copy(
-                                    name = if (fs.name != fs.id && fs.name.isNotBlank()) fs.name else (fb?.name ?: fs.name),
-                                    groups = if (fs.groups.isNotEmpty()) fs.groups else (fb?.groups ?: emptyList())
-                                )
-                            } else {
-                                fb ?: fs
-                            }
-                        }.sortedBy { stream ->
-                            when (stream.id.lowercase()) {
-                                "maths" -> 1
-                                "bio", "biology" -> 2
-                                "commerce" -> 3
-                                "technology" -> 4
-                                "arts" -> 5
-                                else -> 99
-                            }
+                        // A stream without subjects cannot be chosen, so it is hidden here.
+                        // The order comes from the repository (the "order" field in Firebase).
+                        val streams = list.filter { it.subjects.isNotEmpty() }
+                        _state.update {
+                            it.copy(
+                                loading = false,
+                                streams = streams,
+                                error = if (streams.isEmpty()) "No streams are available yet." else null
+                            )
                         }
-                        _state.update { it.copy(loading = false, streams = combined) }
                     },
                     onFailure = { e ->
-                        val fallback = StreamSeeder.getFallbackStreams()
-                        if (fallback.isNotEmpty()) {
-                            _state.update { it.copy(loading = false, streams = fallback) }
-                        } else {
-                            _state.update {
-                                it.copy(loading = false, error = e.localizedMessage ?: "Failed to load streams")
-                            }
+                        _state.update {
+                            it.copy(loading = false, error = e.localizedMessage ?: "Failed to load streams")
                         }
                     }
                 )
