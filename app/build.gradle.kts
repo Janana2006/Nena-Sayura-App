@@ -75,5 +75,9 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
 
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Background sync of reminders (WorkManager)
+    implementation(libs.androidx.work.runtime.ktx)
+    // DataStore (reminder settings)
+    implementation(libs.androidx.datastore.preferences)
 
 }

@@ -14,6 +14,7 @@ import lk.nenasayura.app.data.model.TeacherContent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import lk.nenasayura.app.data.model.SessionStatus
 
 class ResourceAttacherTest {
 
@@ -132,5 +133,24 @@ class ResourceAttacherTest {
             ResourcePool(teacherContent = listOf(video("v1", subject = "phys")))
         ).single()
         assertEquals("", result.resourceId)
+    }
+
+    @Test
+    fun aMissedSessionIsCarriedIntoTheFirstSessionOfThatSubject() {
+        val missed = StudySession(
+            date = "2026-10-12", startMinute = 1110, subjectId = "chem", subjectName = "chem",
+            kind = SessionKind.LEARN_VIDEO, resourceType = ResourceTypes.TEACHER_VIDEO,
+            resourceId = "v1", resourceTitle = "Video v1", resourceUrl = "https://video/v1",
+            status = SessionStatus.MISSED
+        )
+        val result = ResourceAttacher.attach(
+            listOf(session(SessionKind.QUIZ), session(SessionKind.LEARN_VIDEO)),
+            ResourcePool(quizzes = listOf(quiz("q1")), teacherContent = listOf(video("v1"), video("v2"))),
+            carryOver = listOf(missed)
+        )
+        assertEquals("v1", result[0].resourceId)
+        assertEquals("2026-10-12", result[0].originalDate)
+        assertEquals(SessionKind.LEARN_VIDEO, result[0].kind)
+        assertEquals("v2", result[1].resourceId) // v1 is already taken, so the next video is used
     }
 }
