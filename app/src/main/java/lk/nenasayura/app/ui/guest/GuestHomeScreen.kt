@@ -192,13 +192,14 @@ fun GuestHomeScreen(
             }
         } else {
             when (selectedTab) {
-                // Free for guests -> opens the real screens
+                // Free for guests -> opens the real screens (Downloads is locked -> login page)
                 GuestTab.Resources -> GuestResourcesTab(
                     onOpenPapers = onOpenPapers,
                     onOpenMarkingSchemes = onOpenMarkingSchemes,
                     onOpenQuizzes = onOpenQuizzes,
                     onOpenGuideBooks = onOpenGuideBooks,
                     onOpenSearch = onOpenSearch,
+                    onLogin = onLogin,
                     modifier = Modifier.padding(innerPadding)
                 )
                 GuestTab.Study -> GuestStudyTab(

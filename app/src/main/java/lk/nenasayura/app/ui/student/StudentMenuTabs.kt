@@ -73,8 +73,9 @@ fun StudentStudyTab(actions: StudentHomeActions, modifier: Modifier = Modifier) 
 }
 
 /**
- * Guest version of the Resources tab: same cards as the student, all open
- * (papers, marking schemes, quizzes, guide books and search are free for guests).
+ * Guest version of the Resources tab: same cards as the student.
+ * Papers, marking schemes, quizzes, guide books and search are free for guests.
+ * Downloads is locked: tapping it sends the guest to the login page ([onLogin]).
  */
 @Composable
 fun GuestResourcesTab(
@@ -83,6 +84,7 @@ fun GuestResourcesTab(
     onOpenQuizzes: () -> Unit,
     onOpenGuideBooks: () -> Unit,
     onOpenSearch: () -> Unit,
+    onLogin: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     MenuTab(modifier = modifier) {
@@ -91,6 +93,7 @@ fun GuestResourcesTab(
         MenuItemCard("Quizzes", "Practice MCQs with explanations", Icons.Filled.Quiz, onOpenQuizzes, palette = NenaIconColors.Quizzes)
         MenuItemCard("Guide Books", "Teacher guides and study books", Icons.AutoMirrored.Filled.MenuBook, onOpenGuideBooks, palette = NenaIconColors.GuideBooks)
         MenuItemCard("Search", "Find any subject or resource", Icons.Filled.Search, onOpenSearch, palette = NenaIconColors.Progress)
+        MenuItemCard("Downloads", "Saved in the app, open without internet", Icons.Filled.DownloadDone, onLogin, palette = NenaIconColors.Papers, locked = true)
     }
 }
 
