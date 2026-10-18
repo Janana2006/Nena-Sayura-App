@@ -1,15 +1,22 @@
 package lk.nenasayura.app.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import lk.nenasayura.app.data.model.StudentProfile
+import lk.nenasayura.app.util.CloudinaryUploader
+import lk.nenasayura.app.util.ImageUtils
 
 /** Reads and updates the logged-in student's profile and sign-in details. */
 class StudentProfileRepository(
@@ -64,7 +71,8 @@ class StudentProfileRepository(
             streamName = (study?.get("streamName") ?: doc.getString("streamName")) as? String ?: "",
             subjectIds = stringList("subjectIds"),
             subjectNames = stringList("subjectNames"),
-            isGoogleAccount = user.isGoogle()
+            isGoogleAccount = user.isGoogle(),
+            photoUrl = doc.getString("photoUrl") ?: ""
         )
     }
 
@@ -89,6 +97,30 @@ class StudentProfileRepository(
         // Keep the Firebase Auth display name in step too
         val change = UserProfileChangeRequest.Builder().setDisplayName(name.trim()).build()
         user.updateProfile(change).await()
+    }
+
+    /**
+     * Shrinks the chosen picture, uploads it to Cloudinary and saves the link in the
+     * student's profile. Returns the new photo link.
+     */
+    suspend fun uploadProfilePhoto(context: Context, uri: Uri): String {
+        val user = auth.currentUser ?: throw IllegalStateException("Not logged in")
+        val bytes = withContext(Dispatchers.IO) { ImageUtils.compressForUpload(context, uri) }
+        val url = CloudinaryUploader
+            .uploadBytes(bytes, "profile_${user.uid}.jpg", "image/jpeg", "profile_photos")
+            .getOrThrow()
+        db.collection(USERS).document(user.uid)
+            .set(hashMapOf<String, Any>("photoUrl" to url), SetOptions.merge())
+            .await()
+        return url
+    }
+
+    /** Removes the profile photo: the first letter of the name shows again. */
+    suspend fun removeProfilePhoto() {
+        val user = auth.currentUser ?: throw IllegalStateException("Not logged in")
+        db.collection(USERS).document(user.uid)
+            .set(hashMapOf<String, Any>("photoUrl" to FieldValue.delete()), SetOptions.merge())
+            .await()
     }
 
     /** Changes the password directly (no email link). The current password is checked first. */

@@ -15,7 +15,9 @@ data class StudentProfile(
     val subjectIds: List<String> = emptyList(),
     val subjectNames: List<String> = emptyList(),
     /** True when the student signs in with Google. Email and password are then managed by Google. */
-    val isGoogleAccount: Boolean = false
+    val isGoogleAccount: Boolean = false,
+    /** Link of the profile photo (Cloudinary). Empty = no photo, the first letter of the name shows. */
+    val photoUrl: String = ""
 ) {
     val hasStudyDetails: Boolean
         get() = streamName.isNotBlank() && subjectNames.isNotEmpty()

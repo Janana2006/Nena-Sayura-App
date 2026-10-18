@@ -1,5 +1,7 @@
 package lk.nenasayura.app.ui.student.profile
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.FirebaseNetworkException
@@ -27,6 +29,8 @@ data class StudentProfileUiState(
     val errorMessage: String? = null,
     val profile: StudentProfile? = null,
     val saving: Boolean = false,
+    /** The profile photo is being uploaded. */
+    val photoUploading: Boolean = false,
     val message: String? = null
 )
 
@@ -104,6 +108,40 @@ class StudentProfileViewModel(
             if (current != null) {
                 FirebaseSessionProvider.signInStudent(current.uid, cleanName, current.email)
             }
+        }
+    }
+
+    /** The student took or chose a picture: shrink it, upload it and show it. */
+    fun uploadPhoto(context: Context, uri: Uri) {
+        if (_state.value.photoUploading) return
+        viewModelScope.launch {
+            _state.update { it.copy(photoUploading = true) }
+            try {
+                val url = repository.uploadProfilePhoto(context.applicationContext, uri)
+                _state.update {
+                    it.copy(
+                        photoUploading = false,
+                        profile = it.profile?.copy(photoUrl = url),
+                        message = "Profile photo updated"
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        photoUploading = false,
+                        message = "Could not upload the photo: " + (e.localizedMessage ?: "try again")
+                    )
+                }
+            }
+        }
+    }
+
+    fun removePhoto() {
+        perform("Profile photo removed") {
+            repository.removeProfilePhoto()
+            _state.update { it.copy(profile = it.profile?.copy(photoUrl = "")) }
         }
     }
 

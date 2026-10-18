@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Folders the camera is allowed to write the profile photo into (FileProvider) -->
+<paths>
+    <cache-path
+        name="camera"
+        path="camera/" />
+</paths>

@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.student
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,8 +23,10 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -43,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,7 +55,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.core.browse.StudentStudySync
 import lk.nenasayura.app.data.model.StudentProfile
 import lk.nenasayura.app.ui.common.LoadingView
+import lk.nenasayura.app.ui.common.PhotoSourceDialog
+import lk.nenasayura.app.ui.common.ProfileAvatar
 import lk.nenasayura.app.ui.common.RoleSwitchCard
+import lk.nenasayura.app.ui.common.rememberPhotoPicker
 import lk.nenasayura.app.ui.student.profile.ChangeEmailScreen
 import lk.nenasayura.app.ui.student.profile.ChangePasswordScreen
 import lk.nenasayura.app.ui.student.profile.PersonalDetailsScreen
@@ -69,8 +77,8 @@ private val LockedPalette = IconPalette(Color(0xFF6B7280), Color(0xFFE5E7EB))
 private const val GOOGLE_NOTE = "Your email and password are managed by your Google account"
 
 /**
- * Profile tab of the student: header, study details (with change), personal details,
- * email, password and sign out. Each setting opens as a page inside this tab.
+ * Profile tab of the student: header (with the profile photo), study details (with change),
+ * personal details, email, password and sign out. Each setting opens as a page inside this tab.
  */
 @Composable
 fun StudentProfileTab(
@@ -101,6 +109,29 @@ fun StudentProfileTab(
 
     // If the details could not be loaded, still show the name and email we already know
     val profile = state.profile ?: StudentProfile(name = name, email = email)
+
+    // Profile photo: "Take a photo / Choose from gallery / Remove photo"
+    val context = LocalContext.current
+    var showPhotoDialog by rememberSaveable { mutableStateOf(false) }
+    val photoPicker = rememberPhotoPicker { uri -> viewModel.uploadPhoto(context, uri) }
+    if (showPhotoDialog) {
+        PhotoSourceDialog(
+            hasPhoto = profile.photoUrl.isNotBlank(),
+            onCamera = {
+                showPhotoDialog = false
+                photoPicker.launchCamera()
+            },
+            onGallery = {
+                showPhotoDialog = false
+                photoPicker.launchGallery()
+            },
+            onRemove = {
+                showPhotoDialog = false
+                viewModel.removePhoto()
+            },
+            onDismiss = { showPhotoDialog = false }
+        )
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         when {
@@ -137,6 +168,8 @@ fun StudentProfileTab(
 
             else -> ProfileOverview(
                 profile = profile,
+                photoUploading = state.photoUploading,
+                onChangePhoto = { showPhotoDialog = true },
                 errorMessage = state.errorMessage,
                 onOpen = { target ->
                     if (target == ProfilePage.Study) {
@@ -164,6 +197,8 @@ fun StudentProfileTab(
 @Composable
 private fun ProfileOverview(
     profile: StudentProfile,
+    photoUploading: Boolean,
+    onChangePhoto: () -> Unit,
     errorMessage: String?,
     onOpen: (ProfilePage) -> Unit,
     onLockedClick: () -> Unit,
@@ -181,7 +216,7 @@ private fun ProfileOverview(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        ProfileHeader(profile)
+        ProfileHeader(profile, photoUploading, onChangePhoto)
 
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
@@ -280,9 +315,13 @@ private fun ProfileOverview(
     }
 }
 
-/** Gradient header, same look as the Home header. */
+/** Gradient header, same look as the Home header. The photo has a camera button to change it. */
 @Composable
-private fun ProfileHeader(profile: StudentProfile) {
+private fun ProfileHeader(
+    profile: StudentProfile,
+    photoUploading: Boolean,
+    onChangePhoto: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -297,18 +336,46 @@ private fun ProfileHeader(profile: StudentProfile) {
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(84.dp)
-                    .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = profile.name.firstOrNull()?.uppercase() ?: "S",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = NenaPrimary
+            // Photo (or the first letter) with a small camera button to change it
+            Box(modifier = Modifier.size(96.dp)) {
+                ProfileAvatar(
+                    photoUrl = profile.photoUrl,
+                    name = profile.name,
+                    size = 90.dp,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clickable(onClick = onChangePhoto)
                 )
+                if (photoUploading) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(90.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(32.dp)
+                        .background(Color.White, CircleShape)
+                        .clickable(onClick = onChangePhoto),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PhotoCamera,
+                        contentDescription = "Change profile photo",
+                        tint = NenaPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.size(12.dp))
             Text(
