@@ -20,12 +20,17 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,26 +43,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.TeacherProfile
+import lk.nenasayura.app.ui.common.PayoutRow
 import lk.nenasayura.app.ui.student.profile.FormCard
 import lk.nenasayura.app.ui.student.profile.InfoNote
 import lk.nenasayura.app.ui.student.profile.PrimaryActionButton
 import lk.nenasayura.app.ui.student.profile.SubPageHeader
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSecondary
+import lk.nenasayura.app.util.rs
 
 /**
- * Payments tab of the teacher: the bank account the admin sends the earnings to.
- * The admin sees the same details in the Admin > Payments tab.
+ * Payments tab of the teacher:
+ *  - the bank account the admin sends the earnings to,
+ *  - how much was earned, how much was already paid, and how much is still waiting,
+ *  - the history of payments received, each with a link to its receipt.
  */
 @Composable
 fun TeacherPaymentsTab(
     profile: TeacherProfile,
     saving: Boolean,
     onSave: (bankName: String, accountNumber: String, branch: String, onSaved: () -> Unit) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    payoutsViewModel: TeacherPayoutsViewModel = viewModel()
 ) {
     var editing by remember { mutableStateOf(false) }
+    val payouts by payoutsViewModel.state.collectAsStateWithLifecycle()
+
+    // Loads again every time the teacher opens this tab, so a new payment shows up
+    LaunchedEffect(profile.uid) { payoutsViewModel.load(profile.uid) }
 
     // Back from the form returns to the bank card
     BackHandler(enabled = editing) { if (!saving) editing = false }
@@ -80,6 +96,46 @@ fun TeacherPaymentsTab(
         ) {
             BankCard(profile)
 
+            EarningsCard(state = payouts)
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Payment history",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                TextButton(onClick = { payoutsViewModel.load(profile.uid) }) { Text("Refresh") }
+            }
+
+            when {
+                payouts.loading -> Text(
+                    text = "Loading...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                payouts.errorMessage != null -> Text(
+                    text = payouts.errorMessage ?: "",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+
+                payouts.payouts.isEmpty() -> Text(
+                    text = "No payments received yet. When the admin pays you, the time, " +
+                            "amount and receipt will appear here.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                else -> payouts.payouts.forEach { payout ->
+                    PayoutRow(payout = payout, showTeacher = false)
+                }
+            }
+
             InfoNote(
                 if (profile.hasBankDetails) {
                     "The admin sends your earnings to this account. Keep the details correct."
@@ -95,6 +151,51 @@ fun TeacherPaymentsTab(
                 onClick = { editing = true }
             )
         }
+    }
+}
+
+/** Earned, already paid, still waiting. "Waiting" becomes Rs. 0.00 once everything is paid. */
+@Composable
+private fun EarningsCard(state: TeacherPayoutsUiState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Your earnings",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            AmountRow("Total earned (after admin commission)", rs(state.earned))
+            Spacer(modifier = Modifier.height(8.dp))
+            AmountRow("Paid to your bank", rs(state.paidOut), NenaSecondary)
+            Spacer(modifier = Modifier.height(10.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.height(10.dp))
+            AmountRow("Waiting to be paid", rs(state.pending), NenaPrimary, bold = true)
+        }
+    }
+}
+
+@Composable
+private fun AmountRow(label: String, value: String, valueColor: Color = Color.Unspecified, bold: Boolean = false) {
+    val style = if (bold) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = style,
+            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(text = value, style = style, fontWeight = FontWeight.Bold, color = valueColor)
     }
 }
 

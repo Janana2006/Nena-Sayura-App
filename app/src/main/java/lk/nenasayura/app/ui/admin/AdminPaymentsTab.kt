@@ -1,5 +1,8 @@
 package lk.nenasayura.app.ui.admin
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
@@ -22,8 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,22 +38,70 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.data.model.Payment
+import lk.nenasayura.app.ui.common.PayoutRow
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
+import lk.nenasayura.app.util.rs
 
 /**
- * Payments tab: which student paid which teacher, how much, and what the admin
- * and the teacher each get. The commission % can be changed here.
+ * Payments tab of the admin.
+ *  - Student payments: who paid which teacher (tap one to open that teacher).
+ *  - Pay teachers: every teacher with what is still to pay. Tap one to see the bank details,
+ *    add the receipt and confirm the payment.
+ *  - History: every payment made to a teacher, with a link to its receipt.
+ * The commission % can be changed here.
  */
 @Composable
 fun AdminPaymentsTab(
     state: AdminUiState,
     onSaveCommission: (String, (String?) -> Unit) -> Unit,
+    onPayTeacher: (
+        teacherId: String,
+        amount: String,
+        reference: String,
+        receipt: PickedFile?,
+        onResult: (String?) -> Unit
+    ) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var byTeacher by remember { mutableStateOf(false) }
+    var openTeacherId by rememberSaveable { mutableStateOf<String?>(null) }
+    val summary = state.teacherSummaries.firstOrNull { it.teacherId == openTeacherId }
+
+    // Back from a teacher returns to the list
+    BackHandler(enabled = summary != null) { openTeacherId = null }
+
+    if (summary != null) {
+        TeacherPayoutScreen(
+            summary = summary,
+            payments = state.paidPayments.filter { it.teacherId == summary.teacherId },
+            payouts = state.payouts.filter { it.teacherId == summary.teacherId },
+            busy = state.busy,
+            onBack = { openTeacherId = null },
+            onPay = { amount, reference, receipt, onResult ->
+                onPayTeacher(summary.teacherId, amount, reference, receipt, onResult)
+            },
+            modifier = modifier
+        )
+    } else {
+        PaymentsOverview(
+            state = state,
+            onSaveCommission = onSaveCommission,
+            onOpenTeacher = { openTeacherId = it },
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun PaymentsOverview(
+    state: AdminUiState,
+    onSaveCommission: (String, (String?) -> Unit) -> Unit,
+    onOpenTeacher: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var section by rememberSaveable { mutableIntStateOf(0) } // 0 students, 1 pay teachers, 2 history
     var editing by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -67,7 +121,13 @@ fun AdminPaymentsTab(
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(10.dp))
-                MoneyRow("Paid out to teachers", money(state.teachersTotal), bold = true)
+                MoneyRow("Teachers' share", money(state.teachersTotal))
+                Spacer(modifier = Modifier.height(8.dp))
+                MoneyRow("Paid out so far", money(state.payoutsTotal), NenaSecondary)
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(10.dp))
+                MoneyRow("Still to pay", money(state.stillToPay), NenaPrimary, bold = true)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Change commission %")
@@ -76,34 +136,66 @@ fun AdminPaymentsTab(
         }
 
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 FilterChip(
-                    selected = !byTeacher,
-                    onClick = { byTeacher = false },
-                    label = { Text("All payments (${state.payments.size})") }
+                    selected = section == 0,
+                    onClick = { section = 0 },
+                    label = { Text("Students (${state.payments.size})") }
                 )
                 FilterChip(
-                    selected = byTeacher,
-                    onClick = { byTeacher = true },
-                    label = { Text("By teacher (${state.teacherSummaries.size})") }
+                    selected = section == 1,
+                    onClick = { section = 1 },
+                    label = { Text("Pay teachers (${state.teacherSummaries.size})") }
+                )
+                FilterChip(
+                    selected = section == 2,
+                    onClick = { section = 2 },
+                    label = { Text("History (${state.payouts.size})") }
                 )
             }
         }
 
-        if (state.payments.isEmpty()) {
-            item {
-                Text(
-                    text = "No payments yet. When a student hires a teacher and pays, " +
-                            "it will appear here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        when (section) {
+            0 -> {
+                if (state.payments.isEmpty()) {
+                    item {
+                        EmptyText(
+                            "No payments yet. When a student hires a teacher and pays, it will appear here."
+                        )
+                    }
+                } else {
+                    items(state.payments, key = { it.id }) { payment ->
+                        // Tap a payment to open that teacher (only teachers with a paid student can be paid)
+                        val canOpen = state.teacherSummaries.any { it.teacherId == payment.teacherId }
+                        PaymentRow(
+                            payment = payment,
+                            onClick = if (canOpen) ({ onOpenTeacher(payment.teacherId) }) else null
+                        )
+                    }
+                }
             }
-        } else if (!byTeacher) {
-            items(state.payments, key = { it.id }) { payment -> PaymentRow(payment) }
-        } else {
-            items(state.teacherSummaries, key = { it.teacherId + it.teacherName }) { summary ->
-                TeacherSummaryCard(summary)
+
+            1 -> {
+                if (state.teacherSummaries.isEmpty()) {
+                    item { EmptyText("No teacher has been paid by a student yet.") }
+                } else {
+                    items(state.teacherSummaries, key = { it.teacherId }) { teacher ->
+                        TeacherDueCard(teacher, onClick = { onOpenTeacher(teacher.teacherId) })
+                    }
+                }
+            }
+
+            else -> {
+                if (state.payouts.isEmpty()) {
+                    item { EmptyText("You have not paid any teacher yet. Payments you confirm will be listed here.") }
+                } else {
+                    items(state.payouts, key = { it.id }) { payout ->
+                        PayoutRow(payout = payout, showTeacher = true)
+                    }
+                }
             }
         }
     }
@@ -117,10 +209,21 @@ fun AdminPaymentsTab(
     }
 }
 
-/** One payment: "Student hired Teacher", subject, date, amount and status. */
 @Composable
-fun PaymentRow(payment: Payment) {
-    AdminCard {
+private fun EmptyText(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/** One payment of a student. Pass [onClick] to open the teacher it was paid to. */
+@Composable
+fun PaymentRow(payment: Payment, onClick: (() -> Unit)? = null) {
+    AdminCard(
+        modifier = if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -134,7 +237,7 @@ fun PaymentRow(payment: Payment) {
                 Text(
                     text = "hired ${payment.teacherName.ifBlank { "a teacher" }}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = if (onClick != null) NenaPrimary else MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 val sub = listOf(payment.subjectName, formatDate(payment.createdAtMillis))
                     .filter { it.isNotBlank() }
@@ -165,70 +268,38 @@ fun PaymentRow(payment: Payment) {
     }
 }
 
+/** A teacher in the "Pay teachers" list: share, paid out, and what is still to pay. */
 @Composable
-private fun TeacherSummaryCard(summary: TeacherSummary) {
-    AdminCard {
-        Text(
-            text = summary.teacherName,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Text(
-            text = "${summary.students} student${if (summary.students == 1) "" else "s"} paid",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        MoneyRow("Total paid by students", money(summary.gross))
-        Spacer(modifier = Modifier.height(6.dp))
-        MoneyRow("Admin commission", money(summary.commission), NenaSecondary)
-        Spacer(modifier = Modifier.height(6.dp))
-        HorizontalDivider()
-        Spacer(modifier = Modifier.height(6.dp))
-        MoneyRow("Teacher receives", money(summary.net), NenaPrimary, bold = true)
-
-        Spacer(modifier = Modifier.height(10.dp))
-        HorizontalDivider()
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = "Bank details",
-            style = MaterialTheme.typography.labelLarge,
-            color = NenaPrimary,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        if (summary.hasBankDetails) {
-            BankLine("Bank", summary.bankName)
-            BankLine("Account number", summary.accountNumber)
-            BankLine("Branch", summary.bankBranch)
-        } else {
-            Text(
-                text = "This teacher has not added bank details yet.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+private fun TeacherDueCard(summary: TeacherSummary, onClick: () -> Unit) {
+    AdminCard(modifier = Modifier.clickable(onClick = onClick)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = summary.teacherName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "${summary.students} student${if (summary.students == 1) "" else "s"} paid",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (summary.due > 0.0) {
+                Pill("${money(summary.due)} to pay", NenaAccentContainer, Color(0xFF6B4A00))
+            } else {
+                Pill("All paid", NenaSecondaryContainer, Color(0xFF004D40))
+            }
         }
-    }
-}
-
-@Composable
-private fun BankLine(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+        Spacer(modifier = Modifier.height(10.dp))
+        MoneyRow("Teacher's share", money(summary.net))
+        Spacer(modifier = Modifier.height(4.dp))
+        MoneyRow("Paid out", money(summary.paidOut), NenaSecondary)
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = label,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.SemiBold
+            text = if (summary.due > 0.0) "Tap to pay" else "Tap to see the details",
+            style = MaterialTheme.typography.labelMedium,
+            color = NenaPrimary
         )
     }
 }

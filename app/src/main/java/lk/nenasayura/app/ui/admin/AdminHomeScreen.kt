@@ -160,6 +160,7 @@ fun AdminHomeScreen(
                     AdminTab.Payments -> AdminPaymentsTab(
                         state = state,
                         onSaveCommission = viewModel::setCommission,
+                        onPayTeacher = viewModel::payTeacher,
                         modifier = Modifier.padding(innerPadding)
                     )
 

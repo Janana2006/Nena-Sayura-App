@@ -21,7 +21,10 @@ import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.ContentStatus
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.repository.AdminRepository
+import lk.nenasayura.app.data.model.Payout
+import lk.nenasayura.app.data.repository.PayoutRepository
 import lk.nenasayura.app.data.repository.TeacherContentRepository
+import lk.nenasayura.app.util.round2
 
 /** What one teacher earned: students who paid, total paid, admin's cut and the rest. */
 data class TeacherSummary(
@@ -32,9 +35,14 @@ data class TeacherSummary(
     val commission: Double,
     val bankName: String = "",
     val accountNumber: String = "",
-    val bankBranch: String = ""
+    val bankBranch: String = "",
+    /** What the admin has already sent to this teacher (sum of payouts). */
+    val paidOut: Double = 0.0
 ) {
     val net: Double get() = gross - commission
+
+    /** Still to pay to this teacher. Becomes 0 once everything is paid. */
+    val due: Double get() = maxOf(0.0, round2(net - paidOut))
     val hasBankDetails: Boolean
         get() = bankName.isNotBlank() && accountNumber.isNotBlank() && bankBranch.isNotBlank()
 }
@@ -47,6 +55,7 @@ data class AdminUiState(
     val loading: Boolean = true,
     val users: List<AppUser> = emptyList(),
     val payments: List<Payment> = emptyList(),
+    val payouts: List<Payout> = emptyList(),
     val commissionPercent: Double = 10.0,
     val papers: List<Paper> = emptyList(),
     val guideBooks: List<GuideBook> = emptyList(),
@@ -76,6 +85,12 @@ data class AdminUiState(
         get() = paidPayments.sumOf { it.amount * (it.commissionPercent ?: commissionPercent) / 100.0 }
     val teachersTotal: Double get() = gross - commission
 
+    /** Everything already paid out to teachers. */
+    val payoutsTotal: Double get() = round2(payouts.sumOf { it.amount })
+
+    /** Everything still to pay to teachers. */
+    val stillToPay: Double get() = round2(teacherSummaries.sumOf { it.due })
+
     val teacherSummaries: List<TeacherSummary>
         get() = paidPayments.groupBy { it.teacherId }.map { (id, list) ->
             val teacher = users.firstOrNull { it.uid == id }
@@ -87,7 +102,8 @@ data class AdminUiState(
                 commission = list.sumOf { it.amount * (it.commissionPercent ?: commissionPercent) / 100.0 },
                 bankName = teacher?.bankName.orEmpty(),
                 accountNumber = teacher?.accountNumber.orEmpty(),
-                bankBranch = teacher?.bankBranch.orEmpty()
+                bankBranch = teacher?.bankBranch.orEmpty(),
+                paidOut = payouts.filter { it.teacherId == id }.sumOf { it.amount }
             )
         }.sortedByDescending { it.gross }
 
@@ -100,7 +116,8 @@ data class AdminUiState(
 
 class AdminViewModel(
     private val repo: AdminRepository = AdminRepository(),
-    private val contentRepo: TeacherContentRepository = TeacherContentRepository()
+    private val contentRepo: TeacherContentRepository = TeacherContentRepository(),
+    private val payoutRepo: PayoutRepository = PayoutRepository()
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AdminUiState())
@@ -142,6 +159,7 @@ class AdminViewModel(
 
         val users = safe("users", emptyList<AppUser>()) { repo.getUsers() }
         val payments = safe("payments", emptyList<Payment>()) { repo.getPayments() }
+        val payouts = safe("payouts", emptyList<Payout>()) { payoutRepo.getAllPayouts() }
         val percent = safe("commission", 10.0) { repo.getCommissionPercent() }
         val papers = safe("papers", emptyList<Paper>()) { repo.getPapers() }
         val books = safe("guide books", emptyList<GuideBook>()) { repo.getGuideBooks() }
@@ -155,6 +173,7 @@ class AdminViewModel(
                 loading = false,
                 users = users,
                 payments = payments,
+                payouts = payouts,
                 commissionPercent = percent,
                 papers = papers,
                 guideBooks = books,
@@ -357,6 +376,54 @@ class AdminViewModel(
         act("Commission updated", onResult) {
             repo.setCommissionPercent(percent)
             _state.update { it.copy(commissionPercent = percent) }
+        }
+    }
+
+    // ---------------- paying teachers ----------------
+
+    /**
+     * Records a payment to a teacher: uploads the receipt, saves the payout and notifies the teacher.
+     * [onResult] gets null on success, or an error message to show on the form.
+     */
+    fun payTeacher(
+        teacherId: String,
+        amountText: String,
+        reference: String,
+        receipt: PickedFile?,
+        onResult: (String?) -> Unit
+    ) {
+        val summary = _state.value.teacherSummaries.firstOrNull { it.teacherId == teacherId }
+        val amount = amountText.trim().toDoubleOrNull()?.let { round2(it) }
+        val error = when {
+            summary == null -> "This teacher could not be found."
+            !summary.hasBankDetails -> "The teacher has not added bank details yet."
+            amount == null || amount <= 0.0 -> "Enter the amount you paid."
+            amount > summary.due + 0.005 -> "The amount is more than the ${money(summary.due)} still to pay."
+            receipt == null -> "Add the payment receipt (photo or PDF)."
+            else -> null
+        }
+        if (error != null || summary == null || amount == null || receipt == null) {
+            onResult(error)
+            return
+        }
+
+        val admin = FirebaseAuth.getInstance().currentUser
+        val adminName = _state.value.users.firstOrNull { it.uid == admin?.uid }?.name
+            ?.takeIf { it.isNotBlank() } ?: admin?.email.orEmpty()
+
+        act("Payment recorded. The teacher was notified.", onResult) {
+            payoutRepo.createPayout(
+                teacherId = summary.teacherId,
+                teacherName = summary.teacherName,
+                amount = amount,
+                reference = reference.trim(),
+                receiptUri = receipt.uri,
+                receiptName = receipt.name,
+                adminUid = admin?.uid.orEmpty(),
+                adminName = adminName
+            )
+            val payouts = payoutRepo.getAllPayouts()
+            _state.update { it.copy(payouts = payouts) }
         }
     }
 

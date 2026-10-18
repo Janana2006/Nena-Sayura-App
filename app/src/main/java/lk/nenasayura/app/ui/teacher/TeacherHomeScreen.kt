@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -35,6 +36,9 @@ import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.ui.teacher.content.MyContentTab
 import lk.nenasayura.app.ui.teacher.dashboard.TeacherDashboardScreen
+import lk.nenasayura.app.ui.teacher.notifications.NotificationBell
+import lk.nenasayura.app.ui.teacher.notifications.TeacherNotificationsScreen
+import lk.nenasayura.app.ui.teacher.notifications.TeacherNotificationsViewModel
 import lk.nenasayura.app.ui.teacher.payments.TeacherPaymentsTab
 import lk.nenasayura.app.ui.teacher.profile.TeacherProfileTab
 import lk.nenasayura.app.ui.teacher.upload.UploadScreen
@@ -57,10 +61,12 @@ private enum class TeacherTab(val label: String, val title: String, val icon: Im
 fun TeacherHomeScreen(
     onSignOut: () -> Unit,
     onRoleChanged: (String) -> Unit = {},
-    viewModel: TeacherViewModel = viewModel()
+    viewModel: TeacherViewModel = viewModel(),
+    notificationsViewModel: TeacherNotificationsViewModel = viewModel()
 ) {
     val firebaseUser = remember { FirebaseAuth.getInstance().currentUser }
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val notifications by notificationsViewModel.state.collectAsStateWithLifecycle()
 
     LaunchedEffect(firebaseUser?.uid) {
         if (firebaseUser != null) {
@@ -85,11 +91,39 @@ fun TeacherHomeScreen(
     // Back from another tab returns to the Home tab first
     BackHandler(enabled = selectedTab != TeacherTab.Home) { selectedIndex = 0 }
 
+    // The bell number is refreshed on start and whenever the teacher changes tab
+    LaunchedEffect(firebaseUser?.uid, selectedIndex) {
+        firebaseUser?.let { notificationsViewModel.load(it.uid) }
+    }
+
+    // Notifications open as their own screen (from the bell on any tab)
+    var showNotifications by rememberSaveable { mutableStateOf(false) }
+    if (showNotifications) {
+        BackHandler { showNotifications = false }
+        LaunchedEffect(notifications.loading) {
+            if (!notifications.loading) notificationsViewModel.markAllRead()
+        }
+        TeacherNotificationsScreen(
+            state = notifications,
+            onBack = { showNotifications = false },
+            onRefresh = { firebaseUser?.let { notificationsViewModel.load(it.uid) } }
+        )
+        return
+    }
+
     Scaffold(
         topBar = {
             // The Home tab draws its own gradient header
             if (selectedTab != TeacherTab.Home) {
-                NenaTopBar(title = selectedTab.title)
+                NenaTopBar(
+                    title = selectedTab.title,
+                    actions = {
+                        NotificationBell(
+                            count = notifications.badge,
+                            onClick = { showNotifications = true }
+                        )
+                    }
+                )
             }
         },
         bottomBar = {
@@ -131,6 +165,8 @@ fun TeacherHomeScreen(
                     onOpenUpload = { selectedIndex = TeacherTab.Upload.ordinal },
                     onOpenContent = { selectedIndex = TeacherTab.Content.ordinal },
                     onOpenProfile = { selectedIndex = TeacherTab.Profile.ordinal },
+                    unreadCount = notifications.badge,
+                    onOpenNotifications = { showNotifications = true },
                     modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                 )
 
@@ -173,9 +209,6 @@ fun TeacherHomeScreen(
                     saving = state.saving,
                     onLoadSubjects = viewModel::loadStreamSubjects,
                     onSave = viewModel::saveProfile,
-                    photoUploading = state.photoUploading,
-                    onUploadPhoto = viewModel::uploadPhoto,
-                    onRemovePhoto = viewModel::removePhoto,
                     onSignOut = onSignOut,
                     onRoleChanged = onRoleChanged,
                     modifier = Modifier.padding(innerPadding)

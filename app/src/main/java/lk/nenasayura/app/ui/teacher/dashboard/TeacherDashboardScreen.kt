@@ -49,6 +49,7 @@ import lk.nenasayura.app.data.model.AccessType
 import lk.nenasayura.app.data.model.Payment
 import lk.nenasayura.app.data.model.TeacherContent
 import lk.nenasayura.app.data.model.TeacherProfile
+import lk.nenasayura.app.ui.teacher.notifications.NotificationBell
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
@@ -61,6 +62,8 @@ fun TeacherDashboardScreen(
     onOpenUpload: () -> Unit,
     onOpenContent: () -> Unit,
     onOpenProfile: () -> Unit,
+    unreadCount: Int = 0,
+    onOpenNotifications: () -> Unit = {},
     modifier: Modifier = Modifier,
     earningsViewModel: TeacherDashboardViewModel = viewModel()
 ) {
@@ -76,7 +79,11 @@ fun TeacherDashboardScreen(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        TeacherHeader(profile = profile)
+        TeacherHeader(
+            profile = profile,
+            unreadCount = unreadCount,
+            onOpenNotifications = onOpenNotifications
+        )
 
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)) {
             // ---- Upload counts ----
@@ -157,7 +164,7 @@ fun TeacherDashboardScreen(
 }
 
 @Composable
-private fun TeacherHeader(profile: TeacherProfile) {
+private fun TeacherHeader(profile: TeacherProfile, unreadCount: Int, onOpenNotifications: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,6 +198,17 @@ private fun TeacherHeader(profile: TeacherProfile) {
             )
             Spacer(modifier = Modifier.height(12.dp))
         }
+
+        // Bell: opens the notifications (for example "Payment received")
+        NotificationBell(
+            count = unreadCount,
+            onClick = onOpenNotifications,
+            tint = Color.White,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .statusBarsPadding()
+                .padding(end = 8.dp, top = 4.dp)
+        )
     }
 }
 
