@@ -1,7 +1,10 @@
 package lk.nenasayura.app.ui.teacher.profile
 
+import android.content.Context
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +26,9 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -38,18 +43,23 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherProfile
+import lk.nenasayura.app.ui.common.PhotoSourceDialog
+import lk.nenasayura.app.ui.common.ProfileAvatar
 import lk.nenasayura.app.ui.common.RoleSwitchCard
+import lk.nenasayura.app.ui.common.rememberPhotoPicker
 import lk.nenasayura.app.ui.student.profile.FormCard
 import lk.nenasayura.app.ui.student.profile.PrimaryActionButton
 import lk.nenasayura.app.ui.student.profile.SubPageHeader
@@ -73,9 +83,35 @@ fun TeacherProfileTab(
     onSave: (TeacherProfile, () -> Unit) -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
-    onRoleChanged: (String) -> Unit = {}
+    onRoleChanged: (String) -> Unit = {},
+    photoUploading: Boolean = false,
+    onUploadPhoto: (Context, Uri) -> Unit = { _, _ -> },
+    onRemovePhoto: () -> Unit = {}
 ) {
     var editing by remember { mutableStateOf(false) }
+
+    // Profile photo: "Take a photo / Choose from gallery / Remove photo"
+    val context = LocalContext.current
+    var showPhotoDialog by rememberSaveable { mutableStateOf(false) }
+    val photoPicker = rememberPhotoPicker { uri -> onUploadPhoto(context, uri) }
+    if (showPhotoDialog) {
+        PhotoSourceDialog(
+            hasPhoto = profile.photoUrl.isNotBlank(),
+            onCamera = {
+                showPhotoDialog = false
+                photoPicker.launchCamera()
+            },
+            onGallery = {
+                showPhotoDialog = false
+                photoPicker.launchGallery()
+            },
+            onRemove = {
+                showPhotoDialog = false
+                onRemovePhoto()
+            },
+            onDismiss = { showPhotoDialog = false }
+        )
+    }
 
     // Back from the edit page returns to the profile overview
     BackHandler(enabled = editing) { if (!saving) editing = false }
@@ -96,7 +132,11 @@ fun TeacherProfileTab(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            ProfileHeader(profile)
+            ProfileHeader(
+                profile = profile,
+                photoUploading = photoUploading,
+                onChangePhoto = { showPhotoDialog = true }
+            )
 
             Column(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
@@ -125,7 +165,11 @@ fun TeacherProfileTab(
 
 /** Gradient header, same look as the student profile and the Home header. */
 @Composable
-private fun ProfileHeader(profile: TeacherProfile) {
+private fun ProfileHeader(
+    profile: TeacherProfile,
+    photoUploading: Boolean,
+    onChangePhoto: () -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -140,18 +184,46 @@ private fun ProfileHeader(profile: TeacherProfile) {
                 .padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(
-                modifier = Modifier
-                    .size(84.dp)
-                    .background(Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = profile.name.firstOrNull()?.uppercase() ?: "T",
-                    style = MaterialTheme.typography.headlineLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = NenaPrimary
+            // Photo (or the first letter) with a small camera button to change it
+            Box(modifier = Modifier.size(96.dp)) {
+                ProfileAvatar(
+                    photoUrl = profile.photoUrl,
+                    name = profile.name.ifBlank { "T" },
+                    size = 90.dp,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .clickable(onClick = onChangePhoto)
                 )
+                if (photoUploading) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(90.dp)
+                            .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(32.dp),
+                            color = Color.White,
+                            strokeWidth = 3.dp
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(32.dp)
+                        .background(Color.White, CircleShape)
+                        .clickable(onClick = onChangePhoto),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.PhotoCamera,
+                        contentDescription = "Change profile photo",
+                        tint = NenaPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
             Spacer(modifier = Modifier.size(12.dp))
             Text(

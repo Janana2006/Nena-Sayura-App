@@ -173,6 +173,9 @@ fun TeacherHomeScreen(
                     saving = state.saving,
                     onLoadSubjects = viewModel::loadStreamSubjects,
                     onSave = viewModel::saveProfile,
+                    photoUploading = state.photoUploading,
+                    onUploadPhoto = viewModel::uploadPhoto,
+                    onRemovePhoto = viewModel::removePhoto,
                     onSignOut = onSignOut,
                     onRoleChanged = onRoleChanged,
                     modifier = Modifier.padding(innerPadding)

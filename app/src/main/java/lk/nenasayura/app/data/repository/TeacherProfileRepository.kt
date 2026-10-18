@@ -1,11 +1,18 @@
 package lk.nenasayura.app.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import lk.nenasayura.app.data.model.TeacherProfile
+import lk.nenasayura.app.util.CloudinaryUploader
+import lk.nenasayura.app.util.ImageUtils
 
 /** Reads and updates the teacher's profile in the Firestore "users" collection. */
 class TeacherProfileRepository(
@@ -65,7 +72,8 @@ class TeacherProfileRepository(
             fee = (doc.get("fee") as? Number)?.toInt() ?: 0,
             bankName = doc.getString("bankName") ?: "",
             accountNumber = doc.getString("accountNumber") ?: "",
-            bankBranch = doc.getString("bankBranch") ?: ""
+            bankBranch = doc.getString("bankBranch") ?: "",
+            photoUrl = doc.getString("photoUrl") ?: ""
         )
     }
 
@@ -102,6 +110,28 @@ class TeacherProfileRepository(
             "bankBranch" to bankBranch
         )
         db.collection(USERS).document(uid).set(data, SetOptions.merge()).await()
+    }
+
+    /**
+     * Shrinks the chosen picture, uploads it to Cloudinary and saves the link in the
+     * teacher's profile. Returns the new photo link.
+     */
+    suspend fun uploadProfilePhoto(context: Context, uid: String, uri: Uri): String {
+        val bytes = withContext(Dispatchers.IO) { ImageUtils.compressForUpload(context, uri) }
+        val url = CloudinaryUploader
+            .uploadBytes(bytes, "profile_$uid.jpg", "image/jpeg", "profile_photos")
+            .getOrThrow()
+        db.collection(USERS).document(uid)
+            .set(hashMapOf<String, Any>("photoUrl" to url), SetOptions.merge())
+            .await()
+        return url
+    }
+
+    /** Removes the profile photo: the first letter of the name shows again. */
+    suspend fun removeProfilePhoto(uid: String) {
+        db.collection(USERS).document(uid)
+            .set(hashMapOf<String, Any>("photoUrl" to FieldValue.delete()), SetOptions.merge())
+            .await()
     }
 
     private companion object {

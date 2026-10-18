@@ -21,7 +21,9 @@ data class TeacherProfile(
     /** Where the admin sends the teacher's earnings. */
     val bankName: String = "",
     val accountNumber: String = "",
-    val bankBranch: String = ""
+    val bankBranch: String = "",
+    /** Profile photo link (Cloudinary). Empty = the first letter of the name shows. */
+    val photoUrl: String = ""
 ) {
     val hasBankDetails: Boolean
         get() = bankName.isNotBlank() && accountNumber.isNotBlank() && bankBranch.isNotBlank()

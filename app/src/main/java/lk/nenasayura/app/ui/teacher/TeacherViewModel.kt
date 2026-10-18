@@ -1,5 +1,7 @@
 package lk.nenasayura.app.ui.teacher
 
+import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -27,6 +29,8 @@ data class TeacherUiState(
     /** Subjects of the teacher's stream, offered when editing the profile. */
     val streamSubjects: List<Subject> = emptyList(),
     val saving: Boolean = false,
+    /** true while the new profile photo is being uploaded. */
+    val photoUploading: Boolean = false,
     /** One-time message shown in a snackbar. */
     val message: String? = null
 )
@@ -250,6 +254,50 @@ class TeacherViewModel(
                 _state.update {
                     it.copy(saving = false, message = "Could not save bank details: ${e.localizedMessage}")
                 }
+            }
+        }
+    }
+
+    /** The teacher took or chose a picture: shrink it, upload it and show it. */
+    fun uploadPhoto(context: Context, uri: Uri) {
+        val uid = _state.value.profile?.uid ?: return
+        if (_state.value.photoUploading) return
+        _state.update { it.copy(photoUploading = true) }
+        viewModelScope.launch {
+            try {
+                val url = profileRepository.uploadProfilePhoto(context.applicationContext, uid, uri)
+                _state.update {
+                    it.copy(
+                        photoUploading = false,
+                        profile = it.profile?.copy(photoUrl = url),
+                        message = "Profile photo updated"
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        photoUploading = false,
+                        message = "Could not upload the photo: " + (e.localizedMessage ?: "try again")
+                    )
+                }
+            }
+        }
+    }
+
+    fun removePhoto() {
+        val uid = _state.value.profile?.uid ?: return
+        viewModelScope.launch {
+            try {
+                profileRepository.removeProfilePhoto(uid)
+                _state.update {
+                    it.copy(profile = it.profile?.copy(photoUrl = ""), message = "Profile photo removed")
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update { it.copy(message = "Could not remove the photo: ${e.localizedMessage}") }
             }
         }
     }
