@@ -52,6 +52,8 @@ import lk.nenasayura.app.data.model.TeacherProfile
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaIconColors
 
 /** Home tab of the Teacher: welcome header, upload counts, shortcuts and earnings. */
 @Composable
@@ -102,9 +104,9 @@ fun TeacherDashboardScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ShortcutTile("Upload", Icons.Filled.CloudUpload, onOpenUpload, Modifier.weight(1f))
-                ShortcutTile("My Content", Icons.Filled.Folder, onOpenContent, Modifier.weight(1f))
-                ShortcutTile("Profile", Icons.Filled.Person, onOpenProfile, Modifier.weight(1f))
+                ShortcutTile("Upload", Icons.Filled.CloudUpload, NenaIconColors.Quizzes, onOpenUpload, Modifier.weight(1f))
+                ShortcutTile("My Content", Icons.Filled.Folder, NenaIconColors.GuideBooks, onOpenContent, Modifier.weight(1f))
+                ShortcutTile("Profile", Icons.Filled.Person, NenaIconColors.MarkingSchemes, onOpenProfile, Modifier.weight(1f))
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -379,6 +381,7 @@ private fun StatCard(label: String, value: String, modifier: Modifier = Modifier
 private fun ShortcutTile(
     label: String,
     icon: ImageVector,
+    palette: IconPalette,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -398,10 +401,10 @@ private fun ShortcutTile(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(NenaPrimaryContainer, CircleShape),
+                    .background(palette.container, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = NenaPrimary)
+                Icon(imageVector = icon, contentDescription = null, tint = palette.tint)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
