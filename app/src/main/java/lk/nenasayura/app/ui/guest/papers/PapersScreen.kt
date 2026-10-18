@@ -1,7 +1,5 @@
 package lk.nenasayura.app.ui.guest.papers
 
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,6 +35,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.paperTypeLabel
 import lk.nenasayura.app.data.model.termLabel
 import lk.nenasayura.app.ui.common.DocumentCard
+import lk.nenasayura.app.core.session.UserSession
+import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.ui.common.EmptyView
 import lk.nenasayura.app.ui.common.ErrorView
 import lk.nenasayura.app.ui.common.FilterChipRow
@@ -55,6 +55,7 @@ fun PapersScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val isGuest = currentSession().value is UserSession.Guest
     val errorMessage = state.errorMessage
     val visiblePapers = state.filteredPapers
     val categoryTitle = paperCategoryTitle(viewModel.category)
@@ -99,8 +100,6 @@ fun PapersScreen(
                         singleLine = true,
                         shape = RoundedCornerShape(14.dp)
                     )
-
-
 
                     if (state.availableSubjects.isNotEmpty()) {
                         // No "All" chip: one subject is always selected
@@ -196,7 +195,8 @@ fun PapersScreen(
                                         onView = { FileActions.openFile(context, paper.fileUrl, paper.title) },
                                         onDownload = {
                                             FileActions.downloadFile(context, paper.fileUrl, paper.title)
-                                        }
+                                        },
+                                        showDownload = !isGuest
                                     )
                                 }
                             }

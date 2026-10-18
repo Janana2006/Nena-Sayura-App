@@ -2,6 +2,7 @@ package lk.nenasayura.app.navigation
 
 import android.app.Activity
 import android.content.Intent
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,10 +20,13 @@ import lk.nenasayura.app.MainActivity
 import lk.nenasayura.app.core.browse.GuideBrowseSelection
 import lk.nenasayura.app.core.browse.GuideBrowseState
 import lk.nenasayura.app.core.browse.PaperBrowseSelection
+import lk.nenasayura.app.core.browse.StudentStudySync
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.currentSession
 import lk.nenasayura.app.core.session.isStudent
 import lk.nenasayura.app.core.session.isTeacher
+import lk.nenasayura.app.data.model.StudyStream
+import lk.nenasayura.app.data.repository.SetupRepository
 import lk.nenasayura.app.ui.common.FeaturePlaceholderScreen
 import lk.nenasayura.app.ui.common.StudentStudyGate
 import lk.nenasayura.app.ui.common.applyActiveRole
@@ -42,7 +46,6 @@ import lk.nenasayura.app.ui.guest.markingschemes.MarkingSchemeCategoriesScreen
 import lk.nenasayura.app.ui.guest.guidebooks.GuideBookCategoriesScreen
 import lk.nenasayura.app.ui.student.QuickAccessScreen
 import lk.nenasayura.app.core.reminders.ReminderScheduler
-import lk.nenasayura.app.ui.student.profile.ChangeStudyPage
 import lk.nenasayura.app.ui.student.reminders.RemindersScreen
 import lk.nenasayura.app.ui.student.downloads.DownloadsScreen
 import lk.nenasayura.app.ui.student.papers.StreamSelectScreen
@@ -225,11 +228,52 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                 }
             }
         }
-        // "Change" button: pick a new stream + subjects (saved in the profile)
+        // "Change" button: pick a new stream + subjects (saved in the profile).
+        // Uses the same two screens as the guest flow (stream, then subjects).
         composable(Routes.STUDY_EDIT) {
-            ChangeStudyPage(
+            StreamSelectScreen(
                 onBack = { navController.popBackStack() },
-                onSaved = { navController.popBackStack() }
+                onStreamSelected = { streamId ->
+                    navController.navigate(Routes.studyEditSubjectsRoute(streamId))
+                },
+                title = "Change subjects"
+            )
+        }
+        composable(
+            route = Routes.STUDY_EDIT_SUBJECTS,
+            arguments = listOf(navArgument("streamId") { type = NavType.StringType })
+        ) {
+            val editContext = LocalContext.current
+            SubjectSelectScreen(
+                onBack = { navController.popBackStack() },
+                // SubjectSelectScreen already put the new choice into PaperBrowseSelection.
+                // Here it is also saved in the profile, so it stays after the app is closed.
+                onDone = {
+                    val choice = PaperBrowseSelection.state.value
+                    val stream = StudyStream(
+                        id = choice.streamId,
+                        name = choice.streamName,
+                        subjects = choice.subjects
+                    )
+                    SetupRepository().saveSetup("student", stream, choice.subjects) { result ->
+                        result.fold(
+                            onSuccess = {
+                                // Drop the old choice so every screen reloads the new one from the profile
+                                StudentStudySync.onStudyChanged()
+                                navController.popBackStack(Routes.STUDY_EDIT, true)
+                            },
+                            onFailure = { e ->
+                                Toast.makeText(
+                                    editContext,
+                                    e.localizedMessage ?: "Could not save your subjects",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
+                    }
+                },
+                title = "Change subjects",
+                hint = "These subjects will be saved in your profile"
             )
         }
         composable(

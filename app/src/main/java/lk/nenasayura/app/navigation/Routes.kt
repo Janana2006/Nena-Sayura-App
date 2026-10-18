@@ -53,6 +53,9 @@ object Routes {
 
     // "Change" button on Papers / Marking Schemes / Guide Books: change the stream + subjects
     const val STUDY_EDIT = "study_edit"
+    // Step 2 of the "Change" flow: choose the subjects of the chosen stream (same screen guests use)
+    const val STUDY_EDIT_SUBJECTS = "study_edit_subjects/{streamId}"
+    fun studyEditSubjectsRoute(streamId: String) = "study_edit_subjects/$streamId"
 
     // Guests: Papers / Marking Schemes / Guide Books -> choose stream -> choose subjects -> categories.
     // [target] is "papers", "marking_schemes" or "guide_books" (the same as the route names above).

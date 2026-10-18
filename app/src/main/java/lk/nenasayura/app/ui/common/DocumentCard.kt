@@ -1,7 +1,5 @@
 package lk.nenasayura.app.ui.common
 
-
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,7 +44,8 @@ fun DocumentCard(
     badge: String?,
     onView: () -> Unit,
     onDownload: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showDownload: Boolean = true
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -113,7 +112,7 @@ fun DocumentCard(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text("View")
                 }
-                FilledTonalButton(onClick = onDownload, modifier = Modifier.weight(1f)) {
+                if (showDownload) FilledTonalButton(onClick = onDownload, modifier = Modifier.weight(1f)) {
                     Icon(
                         imageVector = Icons.Filled.Download,
                         contentDescription = null,
