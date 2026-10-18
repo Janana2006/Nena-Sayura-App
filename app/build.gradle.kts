@@ -80,4 +80,7 @@ dependencies {
     // DataStore (reminder settings)
     implementation(libs.androidx.datastore.preferences)
 
+    // Splash screen (logo on app start)
+    implementation(libs.androidx.core.splashscreen)
+
 }

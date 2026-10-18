@@ -1,12 +1,12 @@
 package lk.nenasayura.app.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,10 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import lk.nenasayura.app.R
 import lk.nenasayura.app.viewmodel.AuthViewModel
 
 @Composable
@@ -30,7 +32,6 @@ fun CheckScreen(
     var attempt by remember { mutableIntStateOf(0) }
 
     val primaryBlue = Color(0xFF2563EB)
-    val lightBlueBg = Color(0xFFF0F5FF)
 
     LaunchedEffect(attempt) {
         error = false
@@ -108,18 +109,22 @@ fun CheckScreen(
                         Text("Logout", color = Color(0xFF64748B), fontWeight = FontWeight.SemiBold)
                     }
                 } else {
+                    // App logo (gradient background + foreground layers)
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .background(lightBlueBg),
+                            .size(84.dp)
+                            .clip(RoundedCornerShape(22.dp)),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.School,
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_background),
                             contentDescription = null,
-                            tint = primaryBlue,
-                            modifier = Modifier.size(36.dp)
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                            contentDescription = "Nena Sayura logo",
+                            modifier = Modifier.fillMaxSize()
                         )
                     }
                     Spacer(modifier = Modifier.height(20.dp))

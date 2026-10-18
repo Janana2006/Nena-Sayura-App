@@ -54,6 +54,10 @@ import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 import lk.nenasayura.app.util.rs
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 
 /**
  * Payments tab of the admin.
@@ -107,6 +111,27 @@ fun AdminPaymentsTab(
     }
 }
 
+/** Time range used to filter the Students, Pay teachers and History lists. */
+private enum class PayPeriod(val label: String) {
+    ALL("All time"),
+    WEEK("This week"),
+    MONTH("This month"),
+    YEAR("This year");
+
+    /** First moment of the period (week starts on Monday). 0 = no limit. */
+    fun startMillis(): Long {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val start = when (this) {
+            ALL -> return 0L
+            WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            MONTH -> today.withDayOfMonth(1)
+            YEAR -> today.withDayOfYear(1)
+        }
+        return start.atStartOfDay(zone).toInstant().toEpochMilli()
+    }
+}
+
 @Composable
 private fun PaymentsOverview(
     state: AdminUiState,
@@ -116,13 +141,33 @@ private fun PaymentsOverview(
     modifier: Modifier = Modifier
 ) {
     var section by rememberSaveable { mutableIntStateOf(0) } // 0 students, 1 pay teachers, 2 history
+    var periodIndex by rememberSaveable { mutableIntStateOf(0) } // 0 all, 1 week, 2 month, 3 year
+    val period = PayPeriod.entries[periodIndex]
     var editing by remember { mutableStateOf(false) }
     // The payout whose details dialog is open (History tab)
     var openPayoutId by rememberSaveable { mutableStateOf<String?>(null) }
     val openPayout = state.payouts.firstOrNull { it.id == openPayoutId }
 
-    // Teachers that still have money to pay. Fully paid teachers move to History.
-    val dueTeachers = state.teacherSummaries.filter { it.due > 0.0 }
+    // Same state, but only the payments and payouts inside the chosen period.
+    // Every total (paid by students, commission, teachers' share, paid out) follows it.
+    val view = remember(state, periodIndex) {
+        if (period == PayPeriod.ALL) {
+            state
+        } else {
+            val start = period.startMillis()
+            state.copy(
+                payments = state.payments.filter { it.createdAtMillis >= start },
+                payouts = state.payouts.filter { it.createdAtMillis >= start }
+            )
+        }
+    }
+
+    // Teachers that still have money to pay (all time, so the amount to pay is always correct).
+    // With a period chosen, only teachers who got student payments in that period are listed.
+    val periodTeacherIds = view.paidPayments.map { it.teacherId }.toSet()
+    val dueTeachers = state.teacherSummaries.filter {
+        it.due > 0.0 && (period == PayPeriod.ALL || it.teacherId in periodTeacherIds)
+    }
 
     // Same side margin as the Home tab; the header goes edge to edge
     val side = Modifier.padding(horizontal = 16.dp)
@@ -173,21 +218,44 @@ private fun PaymentsOverview(
             }
         }
 
+        // ---- Period filter: all time / this week / this month / this year ----
+        item {
+            Row(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                val periodColors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = NenaSecondaryContainer,
+                    selectedLabelColor = Color(0xFF004D40)
+                )
+                PayPeriod.entries.forEachIndexed { index, p ->
+                    FilterChip(
+                        selected = periodIndex == index,
+                        onClick = { periodIndex = index },
+                        colors = periodColors,
+                        label = { Text(p.label) }
+                    )
+                }
+            }
+        }
+
         item {
             AdminCard(modifier = side) {
-                MoneyRow("Total paid by students", money(state.gross))
+                MoneyRow("Total paid by students", money(view.gross))
                 Spacer(modifier = Modifier.height(8.dp))
                 MoneyRow(
                     label = "Admin commission (${percentText(state.commissionPercent)}%)",
-                    value = money(state.commission),
+                    value = money(view.commission),
                     valueColor = NenaSecondary
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(10.dp))
-                MoneyRow("Teachers' share", money(state.teachersTotal))
+                MoneyRow("Teachers' share", money(view.teachersTotal))
                 Spacer(modifier = Modifier.height(8.dp))
-                MoneyRow("Paid out so far", money(state.payoutsTotal), NenaSecondary)
+                MoneyRow("Paid out", money(view.payoutsTotal), NenaSecondary)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Change commission %")
@@ -210,7 +278,7 @@ private fun PaymentsOverview(
                     selected = section == 0,
                     onClick = { section = 0 },
                     colors = chipColors,
-                    label = { Text("Students (${state.payments.size})") }
+                    label = { Text("Students (${view.payments.size})") }
                 )
                 FilterChip(
                     selected = section == 1,
@@ -222,22 +290,26 @@ private fun PaymentsOverview(
                     selected = section == 2,
                     onClick = { section = 2 },
                     colors = chipColors,
-                    label = { Text("History (${state.payouts.size})") }
+                    label = { Text("History (${view.payouts.size})") }
                 )
             }
         }
 
         when (section) {
             0 -> {
-                if (state.payments.isEmpty()) {
+                if (view.payments.isEmpty()) {
                     item {
                         EmptyText(
-                            "No payments yet. When a student hires a teacher and pays, it will appear here.",
+                            if (period == PayPeriod.ALL) {
+                                "No payments yet. When a student hires a teacher and pays, it will appear here."
+                            } else {
+                                "No student payments ${period.label.lowercase()}."
+                            },
                             modifier = side
                         )
                     }
                 } else {
-                    items(state.payments, key = { it.id }) { payment ->
+                    items(view.payments, key = { it.id }) { payment ->
                         // Tap a payment to open that teacher (only teachers with a paid student can be paid)
                         val canOpen = state.teacherSummaries.any { it.teacherId == payment.teacherId }
                         Box(modifier = side) {
@@ -254,29 +326,44 @@ private fun PaymentsOverview(
                 if (dueTeachers.isEmpty()) {
                     item {
                         EmptyText(
-                            "Nothing to pay right now. Paid teachers are in the History tab.",
+                            if (period == PayPeriod.ALL) {
+                                "Nothing to pay right now. Paid teachers are in the History tab."
+                            } else {
+                                "No teacher to pay for ${period.label.lowercase()}."
+                            },
                             modifier = side
                         )
                     }
                 } else {
                     items(dueTeachers, key = { it.teacherId }) { teacher ->
                         Box(modifier = side) {
-                            TeacherDueCard(teacher, onClick = { onOpenTeacher(teacher.teacherId) })
+                            TeacherDueCard(
+                                summary = teacher,
+                                // Share earned inside the chosen period (null = all time)
+                                periodNet = if (period == PayPeriod.ALL) null else
+                                    view.teacherSummaries.firstOrNull { it.teacherId == teacher.teacherId }?.net ?: 0.0,
+                                periodLabel = period.label.lowercase(),
+                                onClick = { onOpenTeacher(teacher.teacherId) }
+                            )
                         }
                     }
                 }
             }
 
             else -> {
-                if (state.payouts.isEmpty()) {
+                if (view.payouts.isEmpty()) {
                     item {
                         EmptyText(
-                            "You have not paid any teacher yet. Payments you confirm will be listed here.",
+                            if (period == PayPeriod.ALL) {
+                                "You have not paid any teacher yet. Payments you confirm will be listed here."
+                            } else {
+                                "No teacher payouts ${period.label.lowercase()}."
+                            },
                             modifier = side
                         )
                     }
                 } else {
-                    items(state.payouts, key = { it.id }) { payout ->
+                    items(view.payouts, key = { it.id }) { payout ->
                         Box(modifier = side) {
                             PayoutHistoryCard(
                                 payout = payout,
@@ -369,7 +456,12 @@ fun PaymentRow(payment: Payment, onClick: (() -> Unit)? = null) {
 
 /** A teacher in the "Pay teachers" list: share, paid out, and what is still to pay. */
 @Composable
-private fun TeacherDueCard(summary: TeacherSummary, onClick: () -> Unit) {
+private fun TeacherDueCard(
+    summary: TeacherSummary,
+    periodNet: Double?,
+    periodLabel: String,
+    onClick: () -> Unit
+) {
     AdminCard(modifier = Modifier.clickable(onClick = onClick)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
@@ -391,9 +483,13 @@ private fun TeacherDueCard(summary: TeacherSummary, onClick: () -> Unit) {
             }
         }
         Spacer(modifier = Modifier.height(10.dp))
-        MoneyRow("Teacher's share", money(summary.net))
+        if (periodNet != null) {
+            MoneyRow("Earned $periodLabel", money(periodNet))
+            Spacer(modifier = Modifier.height(4.dp))
+        }
+        MoneyRow("Teacher's share (all time)", money(summary.net))
         Spacer(modifier = Modifier.height(4.dp))
-        MoneyRow("Paid out", money(summary.paidOut), NenaSecondary)
+        MoneyRow("Paid out (all time)", money(summary.paidOut), NenaSecondary)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = if (summary.due > 0.0) "Tap to pay" else "Tap to see the details",

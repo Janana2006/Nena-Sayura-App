@@ -6,6 +6,10 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -17,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.core.session.AppSession
 import lk.nenasayura.app.core.session.FirebaseSessionProvider
@@ -24,6 +29,7 @@ import lk.nenasayura.app.screens.CheckScreen
 import lk.nenasayura.app.screens.ForgotPasswordScreen
 import lk.nenasayura.app.screens.HomeScreen
 import lk.nenasayura.app.screens.LoginScreen
+import lk.nenasayura.app.screens.NenaSplashScreen
 import lk.nenasayura.app.screens.RegisterScreen
 import lk.nenasayura.app.screens.ResetPasswordScreen
 import lk.nenasayura.app.screens.RoleSelectScreen
@@ -34,6 +40,7 @@ import lk.nenasayura.app.ui.teacher.TeacherHomeScreen
 import lk.nenasayura.app.ui.theme.NenaSayuraAppTheme
 import lk.nenasayura.app.viewmodel.AuthViewModel
 import lk.nenasayura.app.viewmodel.SetupViewModel
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
@@ -69,6 +76,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
@@ -95,6 +103,13 @@ class MainActivity : ComponentActivity() {
                 // app eka open wela thiyenakota aluth reset link ekak awoth screen eka wenas karanawa
                 LaunchedEffect(resetCode, resetNonce) {
                     if (resetCode != null) selectScreen = "ResetPassword"
+                }
+
+                // Creative splash on top of the app for a moment (skipped when a reset link opened the app)
+                var showSplash by remember { mutableStateOf(resetCode == null) }
+                LaunchedEffect(Unit) {
+                    delay(2200)
+                    showSplash = false
                 }
 
                 var prefillEmail by remember { mutableStateOf("") }
@@ -141,103 +156,112 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    val modifier = Modifier.padding(innerPadding)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                        val modifier = Modifier.padding(innerPadding)
 
-                    when (selectScreen) {
-                        "Login" -> LoginScreen(
-                            modifier = modifier,
-                            viewModel = authViewModel,
-                            initialEmail = prefillEmail,
-                            initialPassword = prefillPassword,
-                            showGuestOption = !fromGuest,
-                            onNavigate = navigate
-                        )
-                        "Register" -> RegisterScreen(
-                            modifier = modifier,
-                            viewModel = authViewModel,
-                            onNavigate = navigate,
-                            onRegistered = { e, p ->
-                                prefillEmail = e
-                                prefillPassword = p
-                                selectScreen = "Login"
-                            }
-                        )
-                        "Forgot" -> ForgotPasswordScreen(modifier, authViewModel, navigate)
-                        // key(resetNonce) - aluth link ekak awoth screen eka mulinma aye check karanawa
-                        "ResetPassword" -> key(resetNonce) {
-                            ResetPasswordScreen(
+                        when (selectScreen) {
+                            "Login" -> LoginScreen(
                                 modifier = modifier,
                                 viewModel = authViewModel,
-                                code = resetCode ?: "",
+                                initialEmail = prefillEmail,
+                                initialPassword = prefillPassword,
+                                showGuestOption = !fromGuest,
                                 onNavigate = navigate
                             )
-                        }
-                        "Check" -> CheckScreen(modifier, authViewModel, navigate)
-
-                        // NEW: Google wage aluth user: Student da Teacher da kiyala ahanawa
-                        "RoleSelect" -> RoleSelectScreen(
-                            modifier = modifier,
-                            viewModel = authViewModel,
-                            onContinue = { role ->
-                                selectScreen = if (role == "teacher") "TeacherSetup" else "StudentSetup"
-                            },
-                            onLogout = {
-                                authViewModel.logout()
-                                selectScreen = "Login"
-                            }
-                        )
-
-                        // Teacher: stream + subject 1k
-                        "TeacherSetup" -> SetupScreen(
-                            modifier = modifier,
-                            viewModel = setupViewModel,
-                            role = "teacher",
-                            onDone = { navigate("TeacherHome") },
-                            onLogout = {
-                                authViewModel.logout()
-                                selectScreen = "Login"
-                            }
-                        )
-
-                        // Student: stream + subjects 3k
-                        "StudentSetup" -> SetupScreen(
-                            modifier = modifier,
-                            viewModel = setupViewModel,
-                            role = "student",
-                            onDone = { navigate("Home") },
-                            onLogout = {
-                                authViewModel.logout()
-                                selectScreen = "Login"
-                            }
-                        )
-
-                        // Teacher: real Teacher Home (ui/teacher)
-                        "TeacherHome" -> TeacherHomeScreen(
-                            // Teacher -> Student dashboard: student home lives in GuestHomeActivity
-                            onRoleChanged = { role ->
-                                applyActiveRole(role)
-                                if (role == "student") {
-                                    startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
-                                    finish()
+                            "Register" -> RegisterScreen(
+                                modifier = modifier,
+                                viewModel = authViewModel,
+                                onNavigate = navigate,
+                                onRegistered = { e, p ->
+                                    prefillEmail = e
+                                    prefillPassword = p
+                                    selectScreen = "Login"
                                 }
-                            },
-                            onSignOut = {
-                                AppSession.provider.signOut()
-                                authViewModel.logout()
-                                selectScreen = "Login"
+                            )
+                            "Forgot" -> ForgotPasswordScreen(modifier, authViewModel, navigate)
+                            // key(resetNonce) - aluth link ekak awoth screen eka mulinma aye check karanawa
+                            "ResetPassword" -> key(resetNonce) {
+                                ResetPasswordScreen(
+                                    modifier = modifier,
+                                    viewModel = authViewModel,
+                                    code = resetCode ?: "",
+                                    onNavigate = navigate
+                                )
                             }
-                        )
+                            "Check" -> CheckScreen(modifier, authViewModel, navigate)
 
-                        // Admin: Admin Dashboard (ui/admin)
-                        "AdminHome" -> AdminHomeScreen(
-                            onSignOut = {
-                                AppSession.provider.signOut()
-                                authViewModel.logout()
-                                selectScreen = "Login"
-                            }
-                        )
-                        "Home" -> HomeScreen(modifier, authViewModel, navigate)
+                            // NEW: Google wage aluth user: Student da Teacher da kiyala ahanawa
+                            "RoleSelect" -> RoleSelectScreen(
+                                modifier = modifier,
+                                viewModel = authViewModel,
+                                onContinue = { role ->
+                                    selectScreen = if (role == "teacher") "TeacherSetup" else "StudentSetup"
+                                },
+                                onLogout = {
+                                    authViewModel.logout()
+                                    selectScreen = "Login"
+                                }
+                            )
+
+                            // Teacher: stream + subject 1k
+                            "TeacherSetup" -> SetupScreen(
+                                modifier = modifier,
+                                viewModel = setupViewModel,
+                                role = "teacher",
+                                onDone = { navigate("TeacherHome") },
+                                onLogout = {
+                                    authViewModel.logout()
+                                    selectScreen = "Login"
+                                }
+                            )
+
+                            // Student: stream + subjects 3k
+                            "StudentSetup" -> SetupScreen(
+                                modifier = modifier,
+                                viewModel = setupViewModel,
+                                role = "student",
+                                onDone = { navigate("Home") },
+                                onLogout = {
+                                    authViewModel.logout()
+                                    selectScreen = "Login"
+                                }
+                            )
+
+                            // Teacher: real Teacher Home (ui/teacher)
+                            "TeacherHome" -> TeacherHomeScreen(
+                                // Teacher -> Student dashboard: student home lives in GuestHomeActivity
+                                onRoleChanged = { role ->
+                                    applyActiveRole(role)
+                                    if (role == "student") {
+                                        startActivity(Intent(this@MainActivity, GuestHomeActivity::class.java))
+                                        finish()
+                                    }
+                                },
+                                onSignOut = {
+                                    AppSession.provider.signOut()
+                                    authViewModel.logout()
+                                    selectScreen = "Login"
+                                }
+                            )
+
+                            // Admin: Admin Dashboard (ui/admin)
+                            "AdminHome" -> AdminHomeScreen(
+                                onSignOut = {
+                                    AppSession.provider.signOut()
+                                    authViewModel.logout()
+                                    selectScreen = "Login"
+                                }
+                            )
+                            "Home" -> HomeScreen(modifier, authViewModel, navigate)
+                        }
+                    }
+
+                    AnimatedVisibility(
+                        visible = showSplash,
+                        exit = fadeOut(animationSpec = tween(450))
+                    ) {
+                        NenaSplashScreen()
                     }
                 }
             }
