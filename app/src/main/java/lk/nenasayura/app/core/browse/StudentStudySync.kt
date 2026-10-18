@@ -4,6 +4,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import lk.nenasayura.app.data.model.StudentProfile
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.StudentProfileRepository
@@ -28,9 +29,14 @@ object StudentStudySync {
      * Returns false when the student has not chosen any subjects yet.
      * Throws when the profile cannot be loaded (for example no internet).
      */
-    suspend fun load(repository: StudentProfileRepository = StudentProfileRepository()): Boolean {
-        val profile = repository.getProfile()
+    suspend fun load(repository: StudentProfileRepository = StudentProfileRepository()): Boolean =
+        apply(repository.getProfile())
 
+    /**
+     * Puts the stream + subjects saved in this profile into the browse selections.
+     * Returns false when the student has not chosen any subjects yet.
+     */
+    fun apply(profile: StudentProfile): Boolean {
         if (!profile.hasStudyDetails || profile.streamId.isBlank() || profile.subjectIds.isEmpty()) {
             PaperBrowseSelection.clear()
             GuideBrowseSelection.clear()

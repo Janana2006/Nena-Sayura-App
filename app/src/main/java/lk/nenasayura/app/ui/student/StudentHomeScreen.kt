@@ -41,8 +41,8 @@ data class StudentHomeActions(
     val onOpenQuickAccess: () -> Unit,
     val onOpenReviews: () -> Unit,
     val onWriteReview: () -> Unit,
-    val onOpenDownloads: () -> Unit = {}
-
+    val onOpenDownloads: () -> Unit = {},
+    val onChangeStudy: () -> Unit = {}
 )
 
 private enum class StudentTab(val label: String, val title: String, val icon: ImageVector) {
@@ -123,6 +123,7 @@ fun StudentHomeScreen(
                 email = email,
                 onSignOut = onSignOut,
                 onRoleChanged = onRoleChanged,
+                onChangeStudy = actions.onChangeStudy,
                 modifier = Modifier.padding(innerPadding)
             )
         }

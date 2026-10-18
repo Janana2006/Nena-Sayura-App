@@ -154,7 +154,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                     onOpenQuickAccess = { navController.navigate(Routes.QUICK_ACCESS) },
                     onOpenReviews = { navController.navigate(Routes.REVIEWS) },
                     onWriteReview = { navController.navigate(Routes.WRITE_REVIEW) },
-                    onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) }
+                    onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) },
+                    onChangeStudy = { navController.navigate(Routes.STUDY_EDIT) }
                 ),
                 // Teacher dashboard ekata switch (session eka wenas wenakota LaunchedEffect eka navigate karanawa)
                 onRoleChanged = { role ->

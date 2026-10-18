@@ -47,14 +47,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import lk.nenasayura.app.core.browse.GuideBrowseSelection
-import lk.nenasayura.app.core.browse.PaperBrowseSelection
+import lk.nenasayura.app.core.browse.StudentStudySync
 import lk.nenasayura.app.data.model.StudentProfile
 import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.RoleSwitchCard
 import lk.nenasayura.app.ui.student.profile.ChangeEmailScreen
 import lk.nenasayura.app.ui.student.profile.ChangePasswordScreen
-import lk.nenasayura.app.ui.student.profile.EditStudyScreen
 import lk.nenasayura.app.ui.student.profile.PersonalDetailsScreen
 import lk.nenasayura.app.ui.student.profile.StudentProfileViewModel
 import lk.nenasayura.app.ui.theme.IconPalette
@@ -81,6 +79,7 @@ fun StudentProfileTab(
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
     onRoleChanged: (String) -> Unit = {},
+    onChangeStudy: () -> Unit = {},
     viewModel: StudentProfileViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -106,19 +105,6 @@ fun StudentProfileTab(
     Box(modifier = modifier.fillMaxSize()) {
         when {
             state.loading -> LoadingView()
-
-            page == ProfilePage.Study -> EditStudyScreen(
-                currentStreamId = profile.streamId,
-                currentSubjectIds = profile.subjectIds,
-                onCancel = { pageIndex = -1 },
-                onSaved = {
-                    pageIndex = -1
-                    // The old stream choice in Papers / Guide Books no longer applies
-                    PaperBrowseSelection.clear()
-                    GuideBrowseSelection.clear()
-                    viewModel.load("Stream and subjects updated")
-                }
-            )
 
             page == ProfilePage.Personal -> PersonalDetailsScreen(
                 profile = profile,
@@ -152,7 +138,15 @@ fun StudentProfileTab(
             else -> ProfileOverview(
                 profile = profile,
                 errorMessage = state.errorMessage,
-                onOpen = { pageIndex = it.ordinal },
+                onOpen = { target ->
+                    if (target == ProfilePage.Study) {
+                        // Same change screens as Papers (stream, then subjects)
+                        StudentStudySync.apply(profile)
+                        onChangeStudy()
+                    } else {
+                        pageIndex = target.ordinal
+                    }
+                },
                 onLockedClick = { viewModel.showMessage(GOOGLE_NOTE) },
                 onRetry = { viewModel.load() },
                 onSignOut = onSignOut,
