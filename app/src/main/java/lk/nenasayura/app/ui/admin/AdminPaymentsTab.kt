@@ -1,9 +1,11 @@
 package lk.nenasayura.app.ui.admin
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -12,11 +14,18 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +42,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.data.model.Payment
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
+import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 import lk.nenasayura.app.util.rs
@@ -63,6 +74,7 @@ fun AdminPaymentsTab(
         receipt: PickedFile?,
         onResult: (String?) -> Unit
     ) -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var openTeacherId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -81,13 +93,15 @@ fun AdminPaymentsTab(
             onPay = { amount, reference, receipt, onResult ->
                 onPayTeacher(summary.teacherId, amount, reference, receipt, onResult)
             },
-            modifier = modifier
+            // This tab has no top bar (the overview draws its own header), so keep clear of the status bar
+            modifier = modifier.statusBarsPadding()
         )
     } else {
         PaymentsOverview(
             state = state,
             onSaveCommission = onSaveCommission,
             onOpenTeacher = { openTeacherId = it },
+            onRefresh = onRefresh,
             modifier = modifier
         )
     }
@@ -98,6 +112,7 @@ private fun PaymentsOverview(
     state: AdminUiState,
     onSaveCommission: (String, (String?) -> Unit) -> Unit,
     onOpenTeacher: (String) -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var section by rememberSaveable { mutableIntStateOf(0) } // 0 students, 1 pay teachers, 2 history
@@ -109,13 +124,57 @@ private fun PaymentsOverview(
     // Teachers that still have money to pay. Fully paid teachers move to History.
     val dueTeachers = state.teacherSummaries.filter { it.due > 0.0 }
 
+    // Same side margin as the Home tab; the header goes edge to edge
+    val side = Modifier.padding(horizontal = 16.dp)
+
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // ---- Header (same look as the Home and Profile tabs) ----
         item {
-            AdminCard {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)),
+                        shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+                    )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .statusBarsPadding()
+                        .padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Payments",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                        Text(
+                            text = money(state.stillToPay),
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Still to pay to teachers",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                    }
+                    IconButton(onClick = onRefresh) {
+                        Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = Color.White)
+                    }
+                }
+            }
+        }
+
+        item {
+            AdminCard(modifier = side) {
                 MoneyRow("Total paid by students", money(state.gross))
                 Spacer(modifier = Modifier.height(8.dp))
                 MoneyRow(
@@ -129,10 +188,6 @@ private fun PaymentsOverview(
                 MoneyRow("Teachers' share", money(state.teachersTotal))
                 Spacer(modifier = Modifier.height(8.dp))
                 MoneyRow("Paid out so far", money(state.payoutsTotal), NenaSecondary)
-                Spacer(modifier = Modifier.height(10.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(10.dp))
-                MoneyRow("Still to pay", money(state.stillToPay), NenaPrimary, bold = true)
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedButton(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Change commission %")
@@ -142,22 +197,31 @@ private fun PaymentsOverview(
 
         item {
             Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                val chipColors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = NenaPrimaryContainer,
+                    selectedLabelColor = NenaPrimary
+                )
                 FilterChip(
                     selected = section == 0,
                     onClick = { section = 0 },
+                    colors = chipColors,
                     label = { Text("Students (${state.payments.size})") }
                 )
                 FilterChip(
                     selected = section == 1,
                     onClick = { section = 1 },
+                    colors = chipColors,
                     label = { Text("Pay teachers (${dueTeachers.size})") }
                 )
                 FilterChip(
                     selected = section == 2,
                     onClick = { section = 2 },
+                    colors = chipColors,
                     label = { Text("History (${state.payouts.size})") }
                 )
             }
@@ -168,41 +232,58 @@ private fun PaymentsOverview(
                 if (state.payments.isEmpty()) {
                     item {
                         EmptyText(
-                            "No payments yet. When a student hires a teacher and pays, it will appear here."
+                            "No payments yet. When a student hires a teacher and pays, it will appear here.",
+                            modifier = side
                         )
                     }
                 } else {
                     items(state.payments, key = { it.id }) { payment ->
                         // Tap a payment to open that teacher (only teachers with a paid student can be paid)
                         val canOpen = state.teacherSummaries.any { it.teacherId == payment.teacherId }
-                        PaymentRow(
-                            payment = payment,
-                            onClick = if (canOpen) ({ onOpenTeacher(payment.teacherId) }) else null
-                        )
+                        Box(modifier = side) {
+                            PaymentRow(
+                                payment = payment,
+                                onClick = if (canOpen) ({ onOpenTeacher(payment.teacherId) }) else null
+                            )
+                        }
                     }
                 }
             }
 
             1 -> {
                 if (dueTeachers.isEmpty()) {
-                    item { EmptyText("Nothing to pay right now. Paid teachers are in the History tab.") }
+                    item {
+                        EmptyText(
+                            "Nothing to pay right now. Paid teachers are in the History tab.",
+                            modifier = side
+                        )
+                    }
                 } else {
                     items(dueTeachers, key = { it.teacherId }) { teacher ->
-                        TeacherDueCard(teacher, onClick = { onOpenTeacher(teacher.teacherId) })
+                        Box(modifier = side) {
+                            TeacherDueCard(teacher, onClick = { onOpenTeacher(teacher.teacherId) })
+                        }
                     }
                 }
             }
 
             else -> {
                 if (state.payouts.isEmpty()) {
-                    item { EmptyText("You have not paid any teacher yet. Payments you confirm will be listed here.") }
+                    item {
+                        EmptyText(
+                            "You have not paid any teacher yet. Payments you confirm will be listed here.",
+                            modifier = side
+                        )
+                    }
                 } else {
                     items(state.payouts, key = { it.id }) { payout ->
-                        PayoutHistoryCard(
-                            payout = payout,
-                            teacher = state.users.firstOrNull { it.uid == payout.teacherId },
-                            onClick = { openPayoutId = payout.id }
-                        )
+                        Box(modifier = side) {
+                            PayoutHistoryCard(
+                                payout = payout,
+                                teacher = state.users.firstOrNull { it.uid == payout.teacherId },
+                                onClick = { openPayoutId = payout.id }
+                            )
+                        }
                     }
                 }
             }
@@ -227,9 +308,10 @@ private fun PaymentsOverview(
 }
 
 @Composable
-private fun EmptyText(text: String) {
+private fun EmptyText(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
+        modifier = modifier,
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

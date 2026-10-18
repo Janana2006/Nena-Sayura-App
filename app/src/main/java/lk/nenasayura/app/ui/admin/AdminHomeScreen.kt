@@ -92,8 +92,10 @@ fun AdminHomeScreen(
 
     Scaffold(
         topBar = {
-            // The Home and Profile tabs draw their own gradient header
-            if (ready && selectedTab != AdminTab.Home && selectedTab != AdminTab.Profile) {
+            // The Home, Payments and Profile tabs draw their own gradient header
+            if (ready && selectedTab != AdminTab.Home && selectedTab != AdminTab.Profile &&
+                selectedTab != AdminTab.Payments
+            ) {
                 NenaTopBar(
                     title = selectedTab.title,
                     actions = {
@@ -161,7 +163,9 @@ fun AdminHomeScreen(
                         state = state,
                         onSaveCommission = viewModel::setCommission,
                         onPayTeacher = viewModel::payTeacher,
-                        modifier = Modifier.padding(innerPadding)
+                        onRefresh = viewModel::reload,
+                        // Goes edge to edge at the top, like Home
+                        modifier = Modifier.padding(bottom = innerPadding.calculateBottomPadding())
                     )
 
                     AdminTab.Content -> AdminContentTab(
