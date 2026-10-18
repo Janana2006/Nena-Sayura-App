@@ -38,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import lk.nenasayura.app.data.model.Payment
-import lk.nenasayura.app.ui.common.PayoutRow
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaSecondary
@@ -103,6 +102,12 @@ private fun PaymentsOverview(
 ) {
     var section by rememberSaveable { mutableIntStateOf(0) } // 0 students, 1 pay teachers, 2 history
     var editing by remember { mutableStateOf(false) }
+    // The payout whose details dialog is open (History tab)
+    var openPayoutId by rememberSaveable { mutableStateOf<String?>(null) }
+    val openPayout = state.payouts.firstOrNull { it.id == openPayoutId }
+
+    // Teachers that still have money to pay. Fully paid teachers move to History.
+    val dueTeachers = state.teacherSummaries.filter { it.due > 0.0 }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -148,7 +153,7 @@ private fun PaymentsOverview(
                 FilterChip(
                     selected = section == 1,
                     onClick = { section = 1 },
-                    label = { Text("Pay teachers (${state.teacherSummaries.size})") }
+                    label = { Text("Pay teachers (${dueTeachers.size})") }
                 )
                 FilterChip(
                     selected = section == 2,
@@ -179,10 +184,10 @@ private fun PaymentsOverview(
             }
 
             1 -> {
-                if (state.teacherSummaries.isEmpty()) {
-                    item { EmptyText("No teacher has been paid by a student yet.") }
+                if (dueTeachers.isEmpty()) {
+                    item { EmptyText("Nothing to pay right now. Paid teachers are in the History tab.") }
                 } else {
-                    items(state.teacherSummaries, key = { it.teacherId }) { teacher ->
+                    items(dueTeachers, key = { it.teacherId }) { teacher ->
                         TeacherDueCard(teacher, onClick = { onOpenTeacher(teacher.teacherId) })
                     }
                 }
@@ -193,11 +198,23 @@ private fun PaymentsOverview(
                     item { EmptyText("You have not paid any teacher yet. Payments you confirm will be listed here.") }
                 } else {
                     items(state.payouts, key = { it.id }) { payout ->
-                        PayoutRow(payout = payout, showTeacher = true)
+                        PayoutHistoryCard(
+                            payout = payout,
+                            teacher = state.users.firstOrNull { it.uid == payout.teacherId },
+                            onClick = { openPayoutId = payout.id }
+                        )
                     }
                 }
             }
         }
+    }
+
+    if (openPayout != null) {
+        PayoutDetailsDialog(
+            payout = openPayout,
+            teacher = state.users.firstOrNull { it.uid == openPayout.teacherId },
+            onDismiss = { openPayoutId = null }
+        )
     }
 
     if (editing) {
