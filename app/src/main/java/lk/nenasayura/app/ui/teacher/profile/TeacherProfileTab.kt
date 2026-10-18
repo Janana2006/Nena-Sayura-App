@@ -1,5 +1,6 @@
 package lk.nenasayura.app.ui.teacher.profile
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,11 +23,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -50,14 +50,20 @@ import java.util.Locale
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.model.TeacherProfile
 import lk.nenasayura.app.ui.common.RoleSwitchCard
+import lk.nenasayura.app.ui.student.profile.FormCard
+import lk.nenasayura.app.ui.student.profile.PrimaryActionButton
+import lk.nenasayura.app.ui.student.profile.SubPageHeader
 import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 
-/** Profile tab: shows the teacher's profile and lets them edit it. */
-@OptIn(ExperimentalLayoutApi::class)
+/**
+ * Profile tab of the teacher. Same look as the student profile:
+ * gradient header, white cards, and the edit form opens as its own page.
+ * (Bank details live in the Payments tab.)
+ */
 @Composable
 fun TeacherProfileTab(
     profile: TeacherProfile,
@@ -71,91 +77,271 @@ fun TeacherProfileTab(
 ) {
     var editing by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Avatar(name = profile.name)
+    // Back from the edit page returns to the profile overview
+    BackHandler(enabled = editing) { if (!saving) editing = false }
 
-        Spacer(modifier = Modifier.height(14.dp))
-        Text(
-            text = profile.name.ifBlank { "Teacher" },
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
+    if (editing) {
+        EditPage(
+            profile = profile,
+            streamSubjects = streamSubjects,
+            saving = saving,
+            onLoadSubjects = onLoadSubjects,
+            onCancel = { editing = false },
+            onSave = { updated -> onSave(updated) { editing = false } },
+            modifier = modifier
         )
-        if (profile.email.isNotBlank()) {
+    } else {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            ProfileHeader(profile)
+
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TeachingCard(profile = profile, onEdit = { editing = true })
+                PersonalCard(profile = profile)
+
+                // Student dashboard (switch, or use as a student too)
+                RoleSwitchCard(currentRole = "teacher", onRoleChanged = onRoleChanged)
+
+                Spacer(modifier = Modifier.size(4.dp))
+                OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sign out")
+                }
+            }
+        }
+    }
+}
+
+/** Gradient header, same look as the student profile and the Home header. */
+@Composable
+private fun ProfileHeader(profile: TeacherProfile) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                brush = Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)),
+                shape = RoundedCornerShape(bottomStart = 28.dp, bottomEnd = 28.dp)
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .background(Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = profile.name.firstOrNull()?.uppercase() ?: "T",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = NenaPrimary
+                )
+            }
+            Spacer(modifier = Modifier.size(12.dp))
             Text(
-                text = profile.email,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = profile.name.ifBlank { "Teacher" },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
             )
+            if (profile.email.isNotBlank()) {
+                Text(
+                    text = profile.email,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White.copy(alpha = 0.85f)
+                )
+            }
+            Spacer(modifier = Modifier.size(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HeaderPill("Teacher")
+                HeaderPill(if (profile.isFree) "Free service" else "Paid • Rs. ${money(profile.fee)}")
+                if (profile.streamName.isNotBlank()) HeaderPill(profile.streamName)
+            }
         }
-        Spacer(modifier = Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Pill("Teacher", NenaPrimaryContainer, NenaPrimary)
-            if (profile.isFree) {
-                Pill("Free service", NenaSecondaryContainer, Color(0xFF004D40))
+    }
+}
+
+@Composable
+private fun HeaderPill(text: String) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = Color.White.copy(alpha = 0.2f)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White
+        )
+    }
+}
+
+/** Stream, numbered subjects and the service (free / paid), with the edit button. */
+@Composable
+private fun TeachingCard(profile: TeacherProfile, onEdit: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Teaching details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.size(10.dp))
+
+            if (profile.subjectNames.isNotEmpty()) {
+                if (profile.streamName.isNotBlank()) {
+                    Text(
+                        text = profile.streamName,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = NenaPrimary
+                    )
+                    Spacer(modifier = Modifier.size(6.dp))
+                }
+                profile.subjectNames.forEachIndexed { index, subject ->
+                    Row(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(NenaPrimaryContainer, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${index + 1}",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = NenaPrimary
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(text = subject, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
             } else {
-                Pill("Paid • Rs. ${money(profile.fee)}", NenaAccentContainer, Color(0xFF6B4A00))
+                Text(
+                    text = "You haven't chosen the subjects you teach yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-        }
 
-        Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.size(12.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.size(12.dp))
 
-        if (editing) {
-            EditForm(
-                profile = profile,
-                streamSubjects = streamSubjects,
-                saving = saving,
-                onLoadSubjects = onLoadSubjects,
-                onCancel = { editing = false },
-                onSave = { updated -> onSave(updated) { editing = false } }
-            )
-        } else {
-            InfoCard("Stream", profile.streamName.ifBlank { "Not set" })
-            Spacer(modifier = Modifier.height(10.dp))
-            InfoCard("Subjects", profile.subjectNames.joinToString(", ").ifBlank { "Not set" })
-            Spacer(modifier = Modifier.height(10.dp))
-            InfoCard("About me", profile.bio.ifBlank { "Add a short bio so students know you." })
-            Spacer(modifier = Modifier.height(10.dp))
-            InfoCard("Phone", profile.phone.ifBlank { "Not added" })
-
-            Spacer(modifier = Modifier.height(20.dp))
-            Button(onClick = { editing = true }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Edit profile")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Your service",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (profile.isFree) {
+                    ServicePill("Free", NenaSecondaryContainer, Color(0xFF004D40))
+                } else {
+                    ServicePill("Paid • Rs. ${money(profile.fee)}", NenaAccentContainer, Color(0xFF6B4A00))
+                }
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            // Student dashboard (switch, or use as a student too)
-            RoleSwitchCard(currentRole = "teacher", onRoleChanged = onRoleChanged)
-            Spacer(modifier = Modifier.height(10.dp))
-            OutlinedButton(onClick = onSignOut, modifier = Modifier.fillMaxWidth()) {
+
+            Spacer(modifier = Modifier.size(12.dp))
+            OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    imageVector = Icons.Filled.Edit,
                     contentDescription = null,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Sign out")
+                Text("Edit profile")
             }
         }
-        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
+@Composable
+private fun ServicePill(text: String, background: Color, textColor: Color) {
+    Surface(shape = RoundedCornerShape(8.dp), color = background) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            style = MaterialTheme.typography.labelLarge,
+            color = textColor
+        )
+    }
+}
+
+/** About me and phone. */
+@Composable
+private fun PersonalCard(profile: TeacherProfile) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Personal details",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.size(12.dp))
+            DetailRow("About me", profile.bio.ifBlank { "Add a short bio so students know you." })
+            Spacer(modifier = Modifier.size(10.dp))
+            HorizontalDivider()
+            Spacer(modifier = Modifier.size(10.dp))
+            DetailRow("Phone", profile.phone.ifBlank { "Not added" })
+        }
+    }
+}
+
+@Composable
+private fun DetailRow(label: String, value: String) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = NenaPrimary,
+        fontWeight = FontWeight.SemiBold
+    )
+    Spacer(modifier = Modifier.height(2.dp))
+    Text(text = value, style = MaterialTheme.typography.bodyLarge)
+}
+
+/** The edit page: opens inside this tab, same look as the student's profile pages. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun EditForm(
+private fun EditPage(
     profile: TeacherProfile,
     streamSubjects: List<Subject>,
     saving: Boolean,
     onLoadSubjects: () -> Unit,
     onCancel: () -> Unit,
-    onSave: (TeacherProfile) -> Unit
+    onSave: (TeacherProfile) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var name by remember { mutableStateOf(profile.name) }
     var bio by remember { mutableStateOf(profile.bio) }
@@ -171,83 +357,114 @@ private fun EditForm(
         (profile.subjects + streamSubjects).distinctBy { it.id }
     }
 
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        OutlinedTextField(
-            value = name,
-            onValueChange = { name = it },
-            label = { Text("Name") },
-            singleLine = true,
-            enabled = !saving,
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = phone,
-            onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' } },
-            label = { Text("Phone (optional)") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            enabled = !saving,
-            modifier = Modifier.fillMaxWidth()
-        )
-        OutlinedTextField(
-            value = bio,
-            onValueChange = { bio = it },
-            label = { Text("About me") },
-            minLines = 3,
-            enabled = !saving,
-            modifier = Modifier.fillMaxWidth()
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SubPageHeader(
+            title = "Edit profile",
+            subtitle = "Update how students see you",
+            onBack = { if (!saving) onCancel() }
         )
 
-        Text("Subjects you teach", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            options.forEach { subject ->
-                FilterChip(
-                    selected = subject.id in selectedIds,
-                    onClick = {
-                        selectedIds = if (subject.id in selectedIds) {
-                            selectedIds - subject.id
-                        } else {
-                            selectedIds + subject.id
-                        }
-                    },
-                    label = { Text(subject.name) },
-                    enabled = !saving
-                )
-            }
-        }
-
-        Text("Your service", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(
-                selected = isFree,
-                onClick = { isFree = true },
-                label = { Text("Free") },
-                enabled = !saving
-            )
-            FilterChip(
-                selected = !isFree,
-                onClick = { isFree = false },
-                label = { Text("Paid") },
-                enabled = !saving
-            )
-        }
-        if (!isFree) {
+        FormCard {
+            Text("Personal details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
-                value = feeText,
-                onValueChange = { feeText = it.filter { c -> c.isDigit() } },
-                label = { Text("Fee (Rs.)") },
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Name") },
                 singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 enabled = !saving,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = phone,
+                onValueChange = { phone = it.filter { c -> c.isDigit() || c == '+' } },
+                label = { Text("Phone (optional)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                enabled = !saving,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = bio,
+                onValueChange = { bio = it },
+                label = { Text("About me") },
+                minLines = 3,
+                enabled = !saving,
+                shape = RoundedCornerShape(14.dp),
                 modifier = Modifier.fillMaxWidth()
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-        Button(
+        FormCard {
+            Text("Subjects you teach", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                options.forEach { subject ->
+                    FilterChip(
+                        selected = subject.id in selectedIds,
+                        onClick = {
+                            selectedIds = if (subject.id in selectedIds) {
+                                selectedIds - subject.id
+                            } else {
+                                selectedIds + subject.id
+                            }
+                        },
+                        label = { Text(subject.name) },
+                        enabled = !saving
+                    )
+                }
+            }
+        }
+
+        FormCard {
+            Text("Your service", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = isFree,
+                    onClick = { isFree = true },
+                    label = { Text("Free") },
+                    enabled = !saving
+                )
+                FilterChip(
+                    selected = !isFree,
+                    onClick = { isFree = false },
+                    label = { Text("Paid") },
+                    enabled = !saving
+                )
+            }
+            if (!isFree) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = feeText,
+                    onValueChange = { feeText = it.filter { c -> c.isDigit() } },
+                    label = { Text("Fee (Rs.)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    enabled = !saving,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        PrimaryActionButton(
+            text = "Save changes",
+            busy = saving,
+            enabled = true,
             onClick = {
                 val chosen = options.filter { it.id in selectedIds }
                 onSave(
@@ -261,78 +478,12 @@ private fun EditForm(
                         subjectNames = chosen.map { it.name }
                     )
                 )
-            },
-            enabled = !saving,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp)
-        ) {
-            if (saving) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.White
-                )
-            } else {
-                Text("Save changes")
             }
-        }
+        )
         OutlinedButton(onClick = onCancel, enabled = !saving, modifier = Modifier.fillMaxWidth()) {
             Text("Cancel")
         }
     }
 }
 
-@Composable
-private fun Avatar(name: String) {
-    Box(
-        modifier = Modifier
-            .size(88.dp)
-            .background(
-                brush = Brush.linearGradient(listOf(NenaPrimary, NenaSecondary)),
-                shape = CircleShape
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = name.firstOrNull()?.uppercase() ?: "T",
-            style = MaterialTheme.typography.headlineLarge,
-            fontWeight = FontWeight.Bold,
-            color = Color.White
-        )
-    }
-}
-
-@Composable
-private fun Pill(text: String, background: Color, textColor: Color) {
-    Surface(shape = RoundedCornerShape(8.dp), color = background) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelLarge,
-            color = textColor
-        )
-    }
-}
-
-@Composable
-private fun InfoCard(label: String, value: String) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelMedium,
-                color = NenaPrimary,
-                fontWeight = FontWeight.SemiBold
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(text = value, style = MaterialTheme.typography.bodyLarge)
-        }
-    }
-}
 private fun money(value: Int): String = String.format(Locale.US, "%,d", value)

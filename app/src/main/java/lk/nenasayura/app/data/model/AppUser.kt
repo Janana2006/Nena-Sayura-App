@@ -15,7 +15,11 @@ data class AppUser(
     /** Staff only: saved access keys. null = old account = full access. */
     val permissions: List<String>? = null,
     /** How the account signs in: "email" or "google" ("" = old account, not recorded yet). */
-    val loginMethod: String = ""
+    val loginMethod: String = "",
+    /** Teacher only: bank details for payouts ("" = not added). */
+    val bankName: String = "",
+    val accountNumber: String = "",
+    val bankBranch: String = ""
 ) {
     val isStudent: Boolean get() = role == "student"
     val isTeacher: Boolean get() = role == "teacher"

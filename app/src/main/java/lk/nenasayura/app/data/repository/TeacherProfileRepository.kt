@@ -37,7 +37,8 @@ class TeacherProfileRepository(
         }
         return (byRole + byRoles)
             .distinctBy { it.id }
-            .map { it.toTeacherProfile("", "") }
+            // Bank details are private: the student's teacher list never carries them
+            .map { it.toTeacherProfile("", "").copy(bankName = "", accountNumber = "", bankBranch = "") }
     }
 
     private fun DocumentSnapshot.toTeacherProfile(fallbackName: String, fallbackEmail: String): TeacherProfile {
@@ -61,7 +62,10 @@ class TeacherProfileRepository(
             subjectIds = stringList("subjectIds"),
             subjectNames = stringList("subjectNames"),
             isFree = doc.getBoolean("isFree") ?: true,
-            fee = (doc.get("fee") as? Number)?.toInt() ?: 0
+            fee = (doc.get("fee") as? Number)?.toInt() ?: 0,
+            bankName = doc.getString("bankName") ?: "",
+            accountNumber = doc.getString("accountNumber") ?: "",
+            bankBranch = doc.getString("bankBranch") ?: ""
         )
     }
 
@@ -88,6 +92,16 @@ class TeacherProfileRepository(
             data["subjectNames"] = profile.subjectNames
         }
         ref.set(data, SetOptions.merge()).await()
+    }
+
+    /** Saves only the three bank fields (Payments tab). Empty strings remove the details. */
+    suspend fun updateBankDetails(uid: String, bankName: String, accountNumber: String, bankBranch: String) {
+        val data = hashMapOf<String, Any>(
+            "bankName" to bankName,
+            "accountNumber" to accountNumber,
+            "bankBranch" to bankBranch
+        )
+        db.collection(USERS).document(uid).set(data, SetOptions.merge()).await()
     }
 
     private companion object {

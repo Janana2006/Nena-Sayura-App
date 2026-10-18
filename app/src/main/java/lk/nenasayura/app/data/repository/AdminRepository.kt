@@ -59,7 +59,10 @@ class AdminRepository(
                         ?.filterIsInstance<String>() ?: emptyList(),
                     staffRole = doc.getString("staffRole") ?: "",
                     permissions = (doc.get("permissions") as? List<*>)?.filterIsInstance<String>(),
-                    loginMethod = doc.getString("loginMethod") ?: ""
+                    loginMethod = doc.getString("loginMethod") ?: "",
+                    bankName = doc.getString("bankName") ?: "",
+                    accountNumber = doc.getString("accountNumber") ?: "",
+                    bankBranch = doc.getString("bankBranch") ?: ""
                 )
             }
             .sortedBy { it.name.lowercase() }

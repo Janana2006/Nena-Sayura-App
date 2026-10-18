@@ -29,9 +29,14 @@ data class TeacherSummary(
     val teacherName: String,
     val students: Int,
     val gross: Double,
-    val commission: Double
+    val commission: Double,
+    val bankName: String = "",
+    val accountNumber: String = "",
+    val bankBranch: String = ""
 ) {
     val net: Double get() = gross - commission
+    val hasBankDetails: Boolean
+        get() = bankName.isNotBlank() && accountNumber.isNotBlank() && bankBranch.isNotBlank()
 }
 
 data class AdminUiState(
@@ -73,12 +78,16 @@ data class AdminUiState(
 
     val teacherSummaries: List<TeacherSummary>
         get() = paidPayments.groupBy { it.teacherId }.map { (id, list) ->
+            val teacher = users.firstOrNull { it.uid == id }
             TeacherSummary(
                 teacherId = id,
                 teacherName = list.firstOrNull { it.teacherName.isNotBlank() }?.teacherName ?: "Unknown teacher",
                 students = list.map { it.studentId }.distinct().size,
                 gross = list.sumOf { it.amount },
-                commission = list.sumOf { it.amount * (it.commissionPercent ?: commissionPercent) / 100.0 }
+                commission = list.sumOf { it.amount * (it.commissionPercent ?: commissionPercent) / 100.0 },
+                bankName = teacher?.bankName.orEmpty(),
+                accountNumber = teacher?.accountNumber.orEmpty(),
+                bankBranch = teacher?.bankBranch.orEmpty()
             )
         }.sortedByDescending { it.gross }
 

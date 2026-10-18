@@ -17,8 +17,15 @@ data class TeacherProfile(
     val subjectNames: List<String> = emptyList(),
     /** true = the teacher's service is free. false = students pay [fee]. */
     val isFree: Boolean = true,
-    val fee: Int = 0
+    val fee: Int = 0,
+    /** Where the admin sends the teacher's earnings. */
+    val bankName: String = "",
+    val accountNumber: String = "",
+    val bankBranch: String = ""
 ) {
+    val hasBankDetails: Boolean
+        get() = bankName.isNotBlank() && accountNumber.isNotBlank() && bankBranch.isNotBlank()
+
     /** The subjects as Subject objects (ids and names are saved as two parallel lists). */
     val subjects: List<Subject>
         get() = subjectIds.mapIndexed { i, id ->

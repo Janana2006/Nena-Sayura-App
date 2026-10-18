@@ -212,6 +212,48 @@ class TeacherViewModel(
         }
     }
 
+    /** Saves the bank details from the Payments tab. All three filled, or all three empty. */
+    fun saveBankDetails(bankName: String, accountNumber: String, branch: String, onSaved: () -> Unit) {
+        val bank = bankName.trim()
+        val account = accountNumber.trim()
+        val bankBranch = branch.trim()
+        val filled = listOf(bank, account, bankBranch).count { it.isNotEmpty() }
+        val error = when {
+            filled in 1..2 -> "Please fill the bank name, account number and branch."
+            filled == 3 && account.length < 6 -> "Please enter a valid account number."
+            else -> null
+        }
+        if (error != null) {
+            _state.update { it.copy(message = error) }
+            return
+        }
+        val uid = _state.value.profile?.uid ?: return
+        _state.update { it.copy(saving = true) }
+        viewModelScope.launch {
+            try {
+                profileRepository.updateBankDetails(uid, bank, account, bankBranch)
+                _state.update {
+                    it.copy(
+                        saving = false,
+                        profile = it.profile?.copy(
+                            bankName = bank,
+                            accountNumber = account,
+                            bankBranch = bankBranch
+                        ),
+                        message = if (filled == 0) "Bank details removed" else "Bank details saved"
+                    )
+                }
+                onSaved()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(saving = false, message = "Could not save bank details: ${e.localizedMessage}")
+                }
+            }
+        }
+    }
+
     fun showMessage(text: String) = _state.update { it.copy(message = text) }
 
     fun consumeMessage() = _state.update { it.copy(message = null) }

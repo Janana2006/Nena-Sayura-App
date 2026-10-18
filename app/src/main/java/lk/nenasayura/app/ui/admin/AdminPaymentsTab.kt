@@ -186,6 +186,50 @@ private fun TeacherSummaryCard(summary: TeacherSummary) {
         HorizontalDivider()
         Spacer(modifier = Modifier.height(6.dp))
         MoneyRow("Teacher receives", money(summary.net), NenaPrimary, bold = true)
+
+        Spacer(modifier = Modifier.height(10.dp))
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(
+            text = "Bank details",
+            style = MaterialTheme.typography.labelLarge,
+            color = NenaPrimary,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        if (summary.hasBankDetails) {
+            BankLine("Bank", summary.bankName)
+            BankLine("Account number", summary.accountNumber)
+            BankLine("Branch", summary.bankBranch)
+        } else {
+            Text(
+                text = "This teacher has not added bank details yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+@Composable
+private fun BankLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
 

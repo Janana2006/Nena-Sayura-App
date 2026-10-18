@@ -3,6 +3,7 @@ package lk.nenasayura.app.ui.teacher
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Home
@@ -34,6 +35,7 @@ import lk.nenasayura.app.ui.common.LoadingView
 import lk.nenasayura.app.ui.common.NenaTopBar
 import lk.nenasayura.app.ui.teacher.content.MyContentTab
 import lk.nenasayura.app.ui.teacher.dashboard.TeacherDashboardScreen
+import lk.nenasayura.app.ui.teacher.payments.TeacherPaymentsTab
 import lk.nenasayura.app.ui.teacher.profile.TeacherProfileTab
 import lk.nenasayura.app.ui.teacher.upload.UploadScreen
 import lk.nenasayura.app.ui.theme.NenaPrimary
@@ -43,6 +45,7 @@ private enum class TeacherTab(val label: String, val title: String, val icon: Im
     Home("Home", "Home", Icons.Filled.Home),
     Content("My Content", "My Content", Icons.Filled.Folder),
     Upload("Upload", "Upload Material", Icons.Filled.CloudUpload),
+    Payments("Payments", "Payments", Icons.Filled.AccountBalance),
     Profile("Profile", "My Profile", Icons.Filled.Person)
 }
 
@@ -154,6 +157,13 @@ fun TeacherHomeScreen(
                         )
                         selectedIndex = TeacherTab.Content.ordinal
                     },
+                    modifier = Modifier.padding(innerPadding)
+                )
+
+                TeacherTab.Payments -> TeacherPaymentsTab(
+                    profile = profile,
+                    saving = state.saving,
+                    onSave = viewModel::saveBankDetails,
                     modifier = Modifier.padding(innerPadding)
                 )
 
