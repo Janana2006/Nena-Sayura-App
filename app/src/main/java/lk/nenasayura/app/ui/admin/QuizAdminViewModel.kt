@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import lk.nenasayura.app.data.model.AdminQuiz
 import lk.nenasayura.app.data.model.NewQuestion
+import lk.nenasayura.app.data.model.QuizQuestion
 import lk.nenasayura.app.data.model.Subject
 import lk.nenasayura.app.data.repository.QuizAdminRepository
 
@@ -18,7 +19,11 @@ data class QuizAdminUiState(
     val loading: Boolean = false,
     val quizzes: List<AdminQuiz> = emptyList(),
     val loadError: String? = null,
-    val busy: Boolean = false
+    val busy: Boolean = false,
+    /** Questions of the quiz the admin is looking at. */
+    val questions: List<QuizQuestion> = emptyList(),
+    val questionsLoading: Boolean = false,
+    val questionsError: String? = null
 )
 
 class QuizAdminViewModel(
@@ -46,6 +51,28 @@ class QuizAdminViewModel(
                 _state.update { it.copy(loading = false, loadError = e.localizedMessage ?: "Failed to load quizzes") }
             }
         }
+    }
+
+    /** Loads the questions of one quiz so the admin can read them. */
+    fun loadQuestions(quizId: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(questionsLoading = true, questionsError = null) }
+            try {
+                val list = repo.getQuestions(quizId)
+                _state.update { it.copy(questionsLoading = false, questions = list) }
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(
+                        questionsLoading = false,
+                        questionsError = e.localizedMessage ?: "Failed to load questions"
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearQuestions() {
+        _state.update { it.copy(questions = emptyList(), questionsLoading = false, questionsError = null) }
     }
 
     fun createQuiz(

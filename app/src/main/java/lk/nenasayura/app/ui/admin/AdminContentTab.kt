@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.admin
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -126,7 +127,7 @@ private fun SectionTile(
         Surface(
             shape = shape,
             color = Color.Transparent,
-            border = if (selected) null else BorderStroke(1.dp, Color(0xFFE3E7EF)),
+            border = if (selected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = if (selected) 6.dp else 1.dp
         ) {
             Column(
@@ -146,7 +147,14 @@ private fun SectionTile(
                 Box(
                     modifier = Modifier
                         .size(38.dp)
-                        .background(if (selected) Color.White.copy(alpha = 0.22f) else section.soft, CircleShape),
+                        .background(
+                            when {
+                                selected -> Color.White.copy(alpha = 0.22f)
+                                isSystemInDarkTheme() -> section.tint.copy(alpha = 0.22f)
+                                else -> section.soft
+                            },
+                            CircleShape
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

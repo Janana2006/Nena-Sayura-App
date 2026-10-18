@@ -5,6 +5,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import lk.nenasayura.app.data.model.AdminQuiz
 import lk.nenasayura.app.data.model.NewQuestion
+import lk.nenasayura.app.data.model.QuizQuestion
 
 class QuizAdminRepository(
     private val db: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -21,6 +22,28 @@ class QuizAdminRepository(
                 questionCount = count
             )
         }.sortedBy { it.title }
+    }
+
+    /** The questions of one quiz, in the order the admin added them. */
+    suspend fun getQuestions(quizId: String): List<QuizQuestion> {
+        val snapshot = db.collection("quizzes").document(quizId)
+            .collection("questions").get().await()
+        return snapshot.documents
+            .mapNotNull { doc ->
+                val text = doc.getString("text") ?: return@mapNotNull null
+                val options = (doc.get("options") as? List<*>)?.mapNotNull { it?.toString() }
+                    ?: return@mapNotNull null
+                val order = (doc.get("order") as? Number)?.toLong() ?: Long.MAX_VALUE
+                order to QuizQuestion(
+                    id = doc.id,
+                    text = text,
+                    options = options,
+                    correctIndex = (doc.get("correctIndex") as? Number)?.toInt() ?: -1,
+                    explanation = doc.getString("explanation") ?: ""
+                )
+            }
+            .sortedWith(compareBy<Pair<Long, QuizQuestion>>({ it.first }, { it.second.id }))
+            .map { it.second }
     }
 
     suspend fun createQuiz(

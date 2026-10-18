@@ -1,9 +1,11 @@
 package lk.nenasayura.app.ui.admin
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Quiz
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -58,7 +62,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -69,11 +72,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import lk.nenasayura.app.data.model.AdminQuiz
 import lk.nenasayura.app.data.model.NewQuestion
+import lk.nenasayura.app.data.model.QuizQuestion
 import lk.nenasayura.app.data.model.StudyStream
 import lk.nenasayura.app.data.model.Subject
-import lk.nenasayura.app.ui.theme.NenaBackground
-import lk.nenasayura.app.ui.theme.NenaPrimary
-import lk.nenasayura.app.ui.theme.NenaSecondary
 
 private sealed interface BuilderMode {
     data object New : BuilderMode
@@ -89,7 +90,8 @@ private data class QuestionDraft(
 )
 
 /**
- * Quizzes: filter by stream & subject, view and search quizzes, add new ones with questions.
+ * Quizzes: filter by stream & subject, search, open a quiz to read its questions,
+ * add new quizzes, add more questions to a quiz. Follows the phone's light / dark mode.
  */
 @Composable
 fun QuizzesSection(
@@ -105,7 +107,25 @@ fun QuizzesSection(
     var selectedSubject by remember { mutableStateOf<Subject?>(null) }
     var query by remember { mutableStateOf("") }
 
+    // The quiz whose questions the admin is reading (null = the quiz list)
+    var viewingId by remember { mutableStateOf<String?>(null) }
+
     LaunchedEffect(Unit) { quizVm.loadOnce() }
+
+    fun openQuiz(quiz: AdminQuiz) {
+        viewingId = quiz.id
+        quizVm.loadQuestions(quiz.id)
+    }
+
+    // Back: builder -> (quiz view or list), quiz view -> list
+    BackHandler(enabled = builder != null || viewingId != null) {
+        if (builder != null) {
+            builder = null
+        } else {
+            viewingId = null
+            quizVm.clearQuestions()
+        }
+    }
 
     val mode = builder
     if (mode != null) {
@@ -118,7 +138,30 @@ fun QuizzesSection(
             onSaved = { message ->
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 builder = null
+                // Back on the quiz view: show the new questions too
+                viewingId?.let { quizVm.loadQuestions(it) }
             }
+        )
+        return
+    }
+
+    val viewing = ui.quizzes.firstOrNull { it.id == viewingId }
+    if (viewing != null) {
+        val viewingStream = state.streams.firstOrNull { st -> st.subjects.any { it.id == viewing.subjectId } }
+        QuizDetail(
+            quiz = viewing,
+            subtitle = listOfNotNull(viewingStream?.name, state.subjectName(viewing.subjectId))
+                .filter { it.isNotBlank() }
+                .joinToString(" • "),
+            questions = ui.questions,
+            loading = ui.questionsLoading,
+            error = ui.questionsError,
+            onBack = {
+                viewingId = null
+                quizVm.clearQuestions()
+            },
+            onAddQuestions = { builder = BuilderMode.AddTo(viewing) },
+            onRetry = { quizVm.loadQuestions(viewing.id) }
         )
         return
     }
@@ -159,7 +202,7 @@ fun QuizzesSection(
                 state.subjectName(quiz.subjectId).contains(query, ignoreCase = true)
     }
 
-    Column(modifier = Modifier.fillMaxSize().background(NenaBackground)) {
+    Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(16.dp),
@@ -185,7 +228,7 @@ fun QuizzesSection(
                         text = "Filter by Stream",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF64748B)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -233,7 +276,7 @@ fun QuizzesSection(
                             text = "Subjects in ${selectedStream!!.name}",
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
-                            color = NenaPrimary
+                            color = MaterialTheme.colorScheme.primary
                         )
                         LazyRow(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -273,25 +316,25 @@ fun QuizzesSection(
                     value = query,
                     onValueChange = { query = it },
                     placeholder = {
-                        Text("Search quiz by title or lesson...", fontSize = 14.sp, color = Color(0xFF94A3B8))
+                        Text("Search quiz by title or lesson...", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     },
                     leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = "Search", tint = NenaPrimary)
+                        Icon(Icons.Default.Search, contentDescription = "Search", tint = MaterialTheme.colorScheme.primary)
                     },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
                             IconButton(onClick = { query = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color(0xFF64748B))
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                     },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = NenaPrimary,
-                        unfocusedBorderColor = Color(0xFFE2E8F0)
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -311,7 +354,7 @@ fun QuizzesSection(
                             .fillMaxWidth()
                             .padding(24.dp),
                         contentAlignment = Alignment.Center
-                    ) { CircularProgressIndicator(color = NenaPrimary) }
+                    ) { CircularProgressIndicator(color = MaterialTheme.colorScheme.primary) }
                 }
             } else if (shown.isEmpty() && ui.loadError == null) {
                 item {
@@ -324,24 +367,24 @@ fun QuizzesSection(
                                 modifier = Modifier
                                     .size(60.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFEFF6FF)),
+                                    .background(MaterialTheme.colorScheme.primaryContainer),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(Icons.Default.Quiz, contentDescription = null, tint = NenaPrimary, modifier = Modifier.size(30.dp))
+                                Icon(Icons.Default.Quiz, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(30.dp))
                             }
                             Spacer(modifier = Modifier.height(12.dp))
                             Text(
                                 text = if (query.isNotBlank()) "No quizzes match \"$query\"" else "No quizzes found in this selection.",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF334155),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 textAlign = TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = "Tap Add quiz above to create a new quiz.",
                                 fontSize = 13.sp,
-                                color = Color(0xFF64748B),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = TextAlign.Center
                             )
                         }
@@ -355,11 +398,15 @@ fun QuizzesSection(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-                        border = BorderStroke(1.dp, Color(0xFFF1F5F9))
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(
+                            modifier = Modifier
+                                .clickable { openQuiz(quiz) }
+                                .padding(16.dp)
+                        ) {
                             // Top Row: Stream/Subject Pill + Question Count Badge
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -368,14 +415,14 @@ fun QuizzesSection(
                             ) {
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = Color(0xFFE0F2FE)
+                                    color = MaterialTheme.colorScheme.primaryContainer
                                 ) {
                                     Text(
                                         text = listOfNotNull(stream?.name, subjectName).filter { it.isNotBlank() }.joinToString(" • "),
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = NenaPrimary,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -384,14 +431,14 @@ fun QuizzesSection(
                                 val qCount = if (quiz.questionCount >= 0) quiz.questionCount else 0
                                 Surface(
                                     shape = RoundedCornerShape(10.dp),
-                                    color = Color(0xFFE6F4EA)
+                                    color = MaterialTheme.colorScheme.secondaryContainer
                                 ) {
                                     Text(
                                         text = "$qCount Question${if (qCount == 1) "" else "s"}",
                                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                                         fontSize = 11.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF137333)
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 }
                             }
@@ -402,7 +449,7 @@ fun QuizzesSection(
                                 text = quiz.title.ifBlank { "Untitled Quiz" },
                                 fontSize = 17.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF1E293B),
+                                color = MaterialTheme.colorScheme.onSurface,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -412,7 +459,7 @@ fun QuizzesSection(
                                 Text(
                                     text = quiz.description,
                                     fontSize = 13.sp,
-                                    color = Color(0xFF64748B),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -420,19 +467,32 @@ fun QuizzesSection(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Bottom Actions: Add Questions + Delete
+                            // Bottom Actions: View + Add Questions + Delete
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                OutlinedButton(
-                                    onClick = { builder = BuilderMode.AddTo(quiz) },
-                                    shape = RoundedCornerShape(12.dp)
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Add Questions", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    Button(
+                                        onClick = { openQuiz(quiz) },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Visibility, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("View", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    }
+                                    OutlinedButton(
+                                        onClick = { builder = BuilderMode.AddTo(quiz) },
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text("Add Questions", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                    }
                                 }
 
                                 IconButton(onClick = { deleting = quiz }) {
@@ -629,7 +689,7 @@ private fun QuizBuilder(
                         CircularProgressIndicator(
                             modifier = Modifier.size(20.dp),
                             strokeWidth = 2.dp,
-                            color = Color.White
+                            color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
                         Text("Save quiz")
@@ -697,7 +757,7 @@ private fun QuestionCard(
                         imageVector = Icons.Filled.CheckCircle,
                         contentDescription = "Correct answer",
                         tint = if (draft.correctIndex == i) {
-                            NenaSecondary
+                            MaterialTheme.colorScheme.secondary
                         } else {
                             MaterialTheme.colorScheme.outlineVariant
                         }
@@ -733,6 +793,219 @@ private fun QuestionCard(
     }
 }
 
+/** One quiz opened: its questions with the answers, and a button to add more questions. */
+@Composable
+private fun QuizDetail(
+    quiz: AdminQuiz,
+    subtitle: String,
+    questions: List<QuizQuestion>,
+    loading: Boolean,
+    error: String?,
+    onBack: () -> Unit,
+    onAddQuestions: () -> Unit,
+    onRetry: () -> Unit
+) {
+    val cs = MaterialTheme.colorScheme
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(cs.background),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        // ---- Header: back + title ----
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back to quizzes")
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = quiz.title.ifBlank { "Untitled Quiz" },
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (subtitle.isNotBlank()) {
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = cs.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+        }
+
+        if (quiz.description.isNotBlank()) {
+            item {
+                Text(
+                    text = quiz.description,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = cs.onSurfaceVariant
+                )
+            }
+        }
+
+        // ---- Add questions ----
+        item {
+            Button(
+                onClick = onAddQuestions,
+                shape = RoundedCornerShape(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add Questions", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // ---- Questions ----
+        if (loading && questions.isEmpty()) {
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator(color = cs.primary) }
+            }
+        } else if (error != null) {
+            item {
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                    Text(error, color = cs.error, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = onRetry) { Text("Try again") }
+                }
+            }
+        } else if (questions.isEmpty()) {
+            item {
+                Text(
+                    text = "No questions in this quiz yet. Tap Add Questions to add some.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = cs.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp)
+                )
+            }
+        } else {
+            item {
+                Text(
+                    text = "${questions.size} question${if (questions.size == 1) "" else "s"}",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = cs.onSurfaceVariant
+                )
+            }
+            itemsIndexed(questions, key = { _, q -> q.id }) { index, question ->
+                QuestionViewCard(number = index + 1, question = question)
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+}
+
+/** A question as the admin reads it: the answers, with the correct one marked. */
+@Composable
+private fun QuestionViewCard(number: Int, question: QuizQuestion) {
+    val cs = MaterialTheme.colorScheme
+    AdminCard {
+        Text(
+            text = "Question $number",
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = cs.primary
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = question.text,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        question.options.forEachIndexed { i, option ->
+            val correct = i == question.correctIndex
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = if (correct) cs.secondaryContainer else cs.surfaceVariant,
+                border = BorderStroke(1.dp, if (correct) cs.secondary else cs.outlineVariant),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(if (correct) cs.secondary else cs.outlineVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = ('A' + i).toString(),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (correct) cs.onSecondary else cs.onSurface
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = option,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (correct) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (correct) cs.onSecondaryContainer else cs.onSurface,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (correct) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Correct answer",
+                            tint = cs.secondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
+        if (question.explanation.isNotBlank()) {
+            Spacer(modifier = Modifier.height(6.dp))
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = cs.primaryContainer,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Explanation",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = cs.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = question.explanation,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = cs.onPrimaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun FilterPill(
     label: String,
@@ -741,13 +1014,15 @@ private fun FilterPill(
     accent: Boolean = false,
     onClick: () -> Unit
 ) {
-    val activeBg = if (accent) NenaSecondary else NenaPrimary
+    val cs = MaterialTheme.colorScheme
+    val activeBg = if (accent) cs.secondary else cs.primary
+    val onActive = if (accent) cs.onSecondary else cs.onPrimary
     val bgColor by animateColorAsState(
-        targetValue = if (isSelected) activeBg else Color.White,
+        targetValue = if (isSelected) activeBg else cs.surface,
         label = "pillBg"
     )
     val textColor by animateColorAsState(
-        targetValue = if (isSelected) Color.White else Color(0xFF475569),
+        targetValue = if (isSelected) onActive else cs.onSurface,
         label = "pillText"
     )
 
@@ -757,7 +1032,7 @@ private fun FilterPill(
         color = bgColor,
         border = BorderStroke(
             width = 1.dp,
-            color = if (isSelected) activeBg else Color(0xFFE2E8F0)
+            color = if (isSelected) activeBg else cs.outlineVariant
         ),
         shadowElevation = if (isSelected) 2.dp else 0.dp
     ) {
@@ -776,8 +1051,8 @@ private fun FilterPill(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(
-                        if (isSelected) Color.White.copy(alpha = 0.25f)
-                        else Color(0xFFF1F5F9)
+                        if (isSelected) onActive.copy(alpha = 0.25f)
+                        else cs.surfaceVariant
                     )
                     .padding(horizontal = 7.dp, vertical = 2.dp)
             ) {
@@ -785,7 +1060,7 @@ private fun FilterPill(
                     text = count.toString(),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (isSelected) Color.White else Color(0xFF64748B)
+                    color = if (isSelected) onActive else cs.onSurfaceVariant
                 )
             }
         }
