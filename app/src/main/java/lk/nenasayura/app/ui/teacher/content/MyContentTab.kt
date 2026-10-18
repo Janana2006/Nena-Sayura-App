@@ -67,6 +67,8 @@ import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 import lk.nenasayura.app.util.FileActions
+import lk.nenasayura.app.ui.theme.IconPalette
+import lk.nenasayura.app.ui.theme.NenaIconColors
 
 /** My Content tab: everything the teacher uploaded, with open, edit and delete. */
 @Composable
@@ -193,13 +195,14 @@ private fun ContentCard(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                val typePalette = typePalette(content.type)
                 Box(
                     modifier = Modifier
                         .size(44.dp)
-                        .background(NenaPrimaryContainer, CircleShape),
+                        .background(typePalette.container, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(typeIcon(content.type), contentDescription = null, tint = NenaPrimary)
+                    Icon(typeIcon(content.type), contentDescription = null, tint = typePalette.tint)
                 }
                 Spacer(modifier = Modifier.width(14.dp))
                 Column(modifier = Modifier.weight(1f)) {
@@ -415,6 +418,15 @@ private fun typeIcon(type: ContentType): ImageVector = when (type) {
     ContentType.MODEL_PAPER -> Icons.Filled.Quiz
     ContentType.NOTE -> Icons.Filled.Description
     ContentType.VIDEO_LINK -> Icons.Filled.PlayCircle
+}
+
+/** Same colours the students see for each kind of material. */
+private fun typePalette(type: ContentType): IconPalette = when (type) {
+    ContentType.SHORT_NOTE -> NenaIconColors.GuideBooks
+    ContentType.TUTE -> NenaIconColors.Papers
+    ContentType.MODEL_PAPER -> NenaIconColors.MarkingSchemes
+    ContentType.NOTE -> NenaIconColors.ResourceBooks
+    ContentType.VIDEO_LINK -> IconPalette(Color(0xFFC62828), Color(0xFFFDE3E3))
 }
 
 private fun formatDate(millis: Long): String =
