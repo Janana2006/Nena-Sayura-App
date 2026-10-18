@@ -583,13 +583,15 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
                         onBack = { navController.popBackStack() },
                         onOpenTeacher = openTeacher,
                         selection = browse,
-                        onChangeSelection = { navController.navigate(Routes.STUDY_EDIT) }
+                        onChangeSelection = { navController.navigate(Routes.STUDY_EDIT) },
+                        onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) }
                     )
                 }
             } else {
                 TeacherListScreen(
                     onBack = { navController.popBackStack() },
-                    onOpenTeacher = openTeacher
+                    onOpenTeacher = openTeacher,
+                    onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) }
                 )
             }
         }
@@ -602,7 +604,8 @@ fun AppNavGraph(navController: NavHostController = rememberNavController()) {
             TeacherMaterialsScreen(
                 teacherId = teacherId,
                 onBack = { navController.popBackStack() },
-                onPay = { navController.navigate(Routes.teacherPaymentRoute(teacherId)) }
+                onPay = { navController.navigate(Routes.teacherPaymentRoute(teacherId)) },
+                onOpenDownloads = { navController.navigate(Routes.DOWNLOADS) }
             )
         }
         // 3) payment dashboard -> confirm -> success -> back to the (now unlocked) materials

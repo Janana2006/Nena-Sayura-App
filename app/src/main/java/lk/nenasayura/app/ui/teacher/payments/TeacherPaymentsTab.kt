@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.teacher.payments
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -32,8 +35,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,8 +57,34 @@ import lk.nenasayura.app.ui.student.profile.InfoNote
 import lk.nenasayura.app.ui.student.profile.PrimaryActionButton
 import lk.nenasayura.app.ui.student.profile.SubPageHeader
 import lk.nenasayura.app.ui.theme.NenaPrimary
+import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondary
 import lk.nenasayura.app.util.rs
+import java.time.DayOfWeek
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
+
+/** Time range used to filter the payment history. */
+private enum class HistoryPeriod(val label: String) {
+    ALL("All time"),
+    WEEK("This week"),
+    MONTH("This month"),
+    YEAR("This year");
+
+    /** First moment of the period (week starts on Monday). 0 = no limit. */
+    fun startMillis(): Long {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        val start = when (this) {
+            ALL -> return 0L
+            WEEK -> today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            MONTH -> today.withDayOfMonth(1)
+            YEAR -> today.withDayOfYear(1)
+        }
+        return start.atStartOfDay(zone).toInstant().toEpochMilli()
+    }
+}
 
 /**
  * Payments tab of the teacher:
@@ -71,6 +102,18 @@ fun TeacherPaymentsTab(
 ) {
     var editing by remember { mutableStateOf(false) }
     val payouts by payoutsViewModel.state.collectAsStateWithLifecycle()
+
+    // Payment history filter: all time / this week / this month / this year
+    var periodIndex by rememberSaveable { mutableIntStateOf(0) }
+    val period = HistoryPeriod.entries[periodIndex]
+    val shownPayouts = remember(payouts.payouts, periodIndex) {
+        if (period == HistoryPeriod.ALL) {
+            payouts.payouts
+        } else {
+            val start = period.startMillis()
+            payouts.payouts.filter { it.createdAtMillis >= start }
+        }
+    }
 
     // Loads again every time the teacher opens this tab, so a new payment shows up
     LaunchedEffect(profile.uid) { payoutsViewModel.load(profile.uid) }
@@ -111,6 +154,34 @@ fun TeacherPaymentsTab(
                 TextButton(onClick = { payoutsViewModel.load(profile.uid) }) { Text("Refresh") }
             }
 
+            // Period chips (only when there is something to filter)
+            if (!payouts.loading && payouts.errorMessage == null && payouts.payouts.isNotEmpty()) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val chipColors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NenaPrimaryContainer,
+                        selectedLabelColor = NenaPrimary
+                    )
+                    HistoryPeriod.entries.forEachIndexed { index, p ->
+                        FilterChip(
+                            selected = periodIndex == index,
+                            onClick = { periodIndex = index },
+                            colors = chipColors,
+                            label = { Text(p.label) }
+                        )
+                    }
+                }
+                Text(
+                    text = "${period.label}: ${shownPayouts.size} payment${if (shownPayouts.size == 1) "" else "s"}" +
+                            "  \u2022  ${rs(shownPayouts.sumOf { it.amount })}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = NenaSecondary
+                )
+            }
+
             when {
                 payouts.loading -> Text(
                     text = "Loading...",
@@ -131,7 +202,13 @@ fun TeacherPaymentsTab(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                else -> payouts.payouts.forEach { payout ->
+                shownPayouts.isEmpty() -> Text(
+                    text = "No payments received ${period.label.lowercase()}.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                else -> shownPayouts.forEach { payout ->
                     PayoutRow(payout = payout, showTeacher = false)
                 }
             }

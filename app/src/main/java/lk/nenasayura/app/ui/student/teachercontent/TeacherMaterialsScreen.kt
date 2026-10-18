@@ -25,6 +25,8 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -35,6 +37,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -70,6 +73,7 @@ import lk.nenasayura.app.ui.theme.NenaAccentContainer
 import lk.nenasayura.app.ui.theme.NenaPrimary
 import lk.nenasayura.app.ui.theme.NenaPrimaryContainer
 import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
+import lk.nenasayura.app.util.DownloadStore
 import lk.nenasayura.app.util.FileActions
 import lk.nenasayura.app.util.YouTubeLinks
 
@@ -86,6 +90,7 @@ fun TeacherMaterialsScreen(
     teacherId: String,
     onBack: () -> Unit,
     onPay: () -> Unit,
+    onOpenDownloads: () -> Unit = {},
     viewModel: TeacherMaterialsViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -127,6 +132,10 @@ fun TeacherMaterialsScreen(
                         onBack = onBack,
                         bottomPadding = 48.dp,
                         actions = {
+                            // Opens the Downloads screen (files saved in the app, work offline)
+                            IconButton(onClick = onOpenDownloads) {
+                                Icon(Icons.Filled.DownloadDone, contentDescription = "Downloads", tint = Color.White)
+                            }
                             IconButton(onClick = { viewModel.load(teacherId) }) {
                                 Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = Color.White)
                             }
@@ -241,6 +250,7 @@ fun TeacherMaterialsScreen(
                             onOpenAnswer = {
                                 FileActions.openFile(context, item.answerFileUrl, item.title)
                             },
+                            onOpenDownloads = onOpenDownloads,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                         )
                     }
@@ -454,9 +464,19 @@ private fun MaterialCard(
     onPay: () -> Unit,
     onOpen: () -> Unit,
     onOpenAnswer: () -> Unit,
+    onOpenDownloads: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val style = item.type.style()
+
+    // Download state: saved inside the app (Downloads screen) / saving right now
+    val context = LocalContext.current
+    remember { DownloadStore.load(context) }
+    val savedItems by DownloadStore.items.collectAsStateWithLifecycle()
+    val busyIds by DownloadStore.busy.collectAsStateWithLifecycle()
+    val isSaved = savedItems.any { it.url == item.fileUrl }
+    val isSaving = DownloadStore.idFor(item.fileUrl) in busyIds
+
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -540,6 +560,36 @@ private fun MaterialCard(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(if (isVideo) "Watch" else "Open")
+                        }
+                        // Download: same as the past papers (saved in the app, works offline).
+                        // Videos can't be downloaded.
+                        if (!isVideo && item.fileUrl.isNotBlank()) {
+                            val showLabel = item.answerFileUrl.isBlank() // keep the row short when there is an Answers button
+                            FilledTonalButton(
+                                onClick = {
+                                    // Already saved: go to the Downloads screen to see it
+                                    if (isSaved) onOpenDownloads()
+                                    else FileActions.downloadFile(context, item.fileUrl, item.title)
+                                },
+                                enabled = !isSaving,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isSaved) Icons.Filled.DownloadDone else Icons.Filled.Download,
+                                    contentDescription = if (isSaved) "Saved in the app" else "Download",
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (showLabel) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        when {
+                                            isSaved -> "Saved"
+                                            isSaving -> "Saving..."
+                                            else -> "Download"
+                                        }
+                                    )
+                                }
+                            }
                         }
                         if (item.answerFileUrl.isNotBlank()) {
                             OutlinedButton(onClick = onOpenAnswer, shape = RoundedCornerShape(12.dp)) {

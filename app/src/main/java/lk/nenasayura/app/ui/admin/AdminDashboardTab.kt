@@ -194,17 +194,17 @@ fun AdminDashboardTab(
             }
 
             // ---- Shortcuts ----
-            val tiles = buildList<Triple<String, ImageVector, () -> Unit>> {
-                if (state.can(AdminPermission.USERS)) add(Triple("Users", Icons.Filled.People, onOpenUsers))
-                if (state.can(AdminPermission.PAYMENTS)) add(Triple("Payments", Icons.Filled.Payments, onOpenPayments))
-                if (state.canSeeContent) add(Triple("Content", Icons.Filled.Folder, onOpenContent))
-                add(Triple("Profile", Icons.Filled.AdminPanelSettings, onOpenStaff)) // always shown
+            val tiles = buildList<QuickTile> {
+                if (state.can(AdminPermission.USERS)) add(QuickTile("Users", Icons.Filled.People, QuickBlue, onOpenUsers))
+                if (state.can(AdminPermission.PAYMENTS)) add(QuickTile("Payments", Icons.Filled.Payments, QuickGreen, onOpenPayments))
+                if (state.canSeeContent) add(QuickTile("Content", Icons.Filled.Folder, QuickOrange, onOpenContent))
+                add(QuickTile("Profile", Icons.Filled.AdminPanelSettings, QuickPurple, onOpenStaff)) // always shown
             }
             Spacer(modifier = Modifier.height(24.dp))
             SectionTitle("Quick access")
             Spacer(modifier = Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                tiles.forEach { (label, icon, onClick) -> ShortcutTile(label, icon, onClick, Modifier.weight(1f)) }
+                tiles.forEach { t -> ShortcutTile(t.label, t.icon, t.color, t.onClick, Modifier.weight(1f)) }
                 repeat(4 - tiles.size) { Spacer(modifier = Modifier.weight(1f)) }
             }
 
@@ -230,10 +230,24 @@ fun AdminDashboardTab(
     }
 }
 
+// Each quick access tile has its own colour (like the coloured avatars in Contacts)
+private val QuickBlue = Color(0xFF2F6FED)
+private val QuickGreen = Color(0xFF1E9E5A)
+private val QuickOrange = Color(0xFFF28C00)
+private val QuickPurple = Color(0xFF8E5CF5)
+
+private data class QuickTile(
+    val label: String,
+    val icon: ImageVector,
+    val color: Color,
+    val onClick: () -> Unit
+)
+
 @Composable
 private fun ShortcutTile(
     label: String,
     icon: ImageVector,
+    color: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -253,10 +267,10 @@ private fun ShortcutTile(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(NenaPrimaryContainer, CircleShape),
+                    .background(color.copy(alpha = 0.16f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = NenaPrimary)
+                Icon(imageVector = icon, contentDescription = null, tint = color)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(

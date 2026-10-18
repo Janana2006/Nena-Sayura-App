@@ -2,6 +2,7 @@ package lk.nenasayura.app.ui.student.teachercontent
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.DownloadDone
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.WorkspacePremium
@@ -52,6 +55,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +80,15 @@ import lk.nenasayura.app.ui.theme.NenaSecondaryContainer
 private val AmberText = Color(0xFF6B4A00)
 private val TealText = Color(0xFF004D40)
 
+// Every subject has its own colour (same colour in the filter strip and on the teacher cards)
+private val SubjectPalette = listOf(
+    Color(0xFF2F6FED), Color(0xFF1E9E5A), Color(0xFFF28C00),
+    Color(0xFF8E5CF5), Color(0xFFE5484D), Color(0xFF0BA5C4)
+)
+
+private fun subjectColor(name: String): Color =
+    SubjectPalette[(name.trim().lowercase().hashCode() and 0x7fffffff) % SubjectPalette.size]
+
 /**
  * Student screen "My teacher".
  * By default it lists only the teachers of the subjects the student chose at sign-up.
@@ -89,6 +103,8 @@ fun TeacherListScreen(
     selection: PaperBrowseState = PaperBrowseState(),
     /** Opens the "change stream / subjects" screen. null = no Change button. */
     onChangeSelection: (() -> Unit)? = null,
+    /** Opens the Downloads screen (files saved in the app, work offline). */
+    onOpenDownloads: () -> Unit = {},
     viewModel: TeacherListViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,6 +125,9 @@ fun TeacherListScreen(
                 onBack = onBack,
                 bottomPadding = 22.dp,
                 actions = {
+                    IconButton(onClick = onOpenDownloads) {
+                        Icon(Icons.Filled.DownloadDone, contentDescription = "Downloads", tint = Color.White)
+                    }
                     IconButton(onClick = { viewModel.load() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = Color.White)
                     }
@@ -259,37 +278,33 @@ private fun SubjectFilterStrip(
     onAll: () -> Unit,
     onChange: (() -> Unit)?
 ) {
-    val chipColors = FilterChipDefaults.filterChipColors(
-        selectedContainerColor = NenaPrimaryContainer,
-        selectedLabelColor = NenaPrimary
-    )
-    Column(modifier = Modifier.padding(top = 12.dp)) {
+    Column(modifier = Modifier.padding(top = 14.dp)) {
         LazyRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item {
-                FilterChip(
+                SubjectPill(
+                    label = "My subjects",
                     selected = !showAll && chosen == null,
-                    onClick = onMine,
-                    label = { Text("My subjects") },
-                    colors = chipColors
+                    color = NenaPrimary,
+                    onClick = onMine
                 )
             }
             items(selection.subjects, key = { it.id }) { subject ->
-                FilterChip(
+                SubjectPill(
+                    label = subject.name,
                     selected = !showAll && chosen?.id == subject.id,
-                    onClick = { onSubject(subject) },
-                    label = { Text(subject.name) },
-                    colors = chipColors
+                    color = subjectColor(subject.name),
+                    onClick = { onSubject(subject) }
                 )
             }
             item {
-                FilterChip(
+                SubjectPill(
+                    label = "All teachers",
                     selected = showAll,
-                    onClick = onAll,
-                    label = { Text("All teachers") },
-                    colors = chipColors
+                    color = NenaSecondary,
+                    onClick = onAll
                 )
             }
         }
@@ -311,6 +326,26 @@ private fun SubjectFilterStrip(
                 TextButton(onClick = onChange) { Text("Change subjects") }
             }
         }
+    }
+}
+
+/** A rounded subject filter: filled with its colour when selected, soft tint when not. */
+@Composable
+private fun SubjectPill(label: String, selected: Boolean, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) color else color.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 9.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = if (selected) Color.White else color,
+            maxLines = 1
+        )
     }
 }
 
@@ -381,31 +416,37 @@ private fun SectionHeader(
     iconBackground: Color
 ) {
     Row(
-        modifier = Modifier.padding(top = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .background(iconBackground.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
                 .size(32.dp)
-                .background(iconBackground, CircleShape),
+                .background(Color.White, CircleShape),
             contentAlignment = Alignment.Center
         ) { icon() }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = title,
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF1E2433)
         )
-        Spacer(modifier = Modifier.width(8.dp))
         Box(
             modifier = Modifier
-                .background(MaterialTheme.colorScheme.surfaceVariant, CircleShape)
-                .padding(horizontal = 9.dp, vertical = 2.dp)
+                .background(Color.White, CircleShape)
+                .padding(horizontal = 11.dp, vertical = 3.dp)
         ) {
             Text(
                 text = "$count",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1E2433)
             )
         }
     }
@@ -419,89 +460,145 @@ private fun TeacherCard(
     onClick: () -> Unit
 ) {
     val isPaid = teacher.isPaidTeacher
+    val accent = if (isPaid) NenaAccent else NenaSecondary
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(24.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
-        Row(modifier = Modifier
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)) {
-            // coloured edge: teal = free, gold = paid
+        Column {
+            // colour band on top: teal = free, gold = paid
             Box(
                 modifier = Modifier
-                    .width(5.dp)
-                    .fillMaxHeight()
-                    .background(if (isPaid) NenaAccent else NenaSecondary)
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .background(Brush.horizontalGradient(listOf(accent, accent.copy(alpha = 0.3f))))
             )
-            Row(
-                modifier = Modifier.padding(14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TeacherAvatar(name = teacher.name, size = 54)
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = teacher.name.ifBlank { "Teacher" },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (teacher.streamName.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(3.dp))
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // avatar with a gradient ring
+                    Box(
+                        modifier = Modifier
+                            .size(66.dp)
+                            .background(Brush.linearGradient(listOf(accent, NenaPrimary)), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Box(
                             modifier = Modifier
-                                .background(NenaPrimaryContainer, RoundedCornerShape(50))
-                                .padding(horizontal = 9.dp, vertical = 2.dp)
+                                .size(61.dp)
+                                .background(MaterialTheme.colorScheme.surface, CircleShape),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Text(
-                                text = teacher.streamName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = NenaPrimary,
-                                maxLines = 1
-                            )
+                            TeacherAvatar(name = teacher.name, size = 54)
                         }
                     }
-                    if (teacher.subjectNames.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = teacher.subjectNames.joinToString("  \u2022  "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
+                            text = teacher.name.ifBlank { "Teacher" },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (isPaid) {
-                            if (alreadyPaid) {
-                                IconPill("Unlocked", NenaSecondaryContainer, TealText, Icons.Filled.CheckCircle)
-                            } else {
-                                IconPill(formatFee(teacher.fee), NenaAccentContainer, AmberText, Icons.Filled.WorkspacePremium)
+                        if (teacher.streamName.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(NenaPrimaryContainer, RoundedCornerShape(50))
+                                    .padding(horizontal = 9.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = teacher.streamName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = NenaPrimary,
+                                    maxLines = 1
+                                )
                             }
-                        } else {
-                            IconPill("Free", NenaSecondaryContainer, TealText, Icons.Filled.CardGiftcard)
                         }
-                        IconPill(
-                            text = if (materialCount == 1) "1 material" else "$materialCount materials",
-                            background = MaterialTheme.colorScheme.surfaceVariant,
-                            textColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                            icon = Icons.Filled.Description
-                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+                    if (isPaid) {
+                        if (alreadyPaid) {
+                            IconPill("Unlocked", NenaSecondaryContainer, TealText, Icons.Filled.CheckCircle)
+                        } else {
+                            IconPill(formatFee(teacher.fee), NenaAccentContainer, AmberText, Icons.Filled.WorkspacePremium)
+                        }
+                    } else {
+                        IconPill("Free", NenaSecondaryContainer, TealText, Icons.Filled.CardGiftcard)
                     }
                 }
 
-                Icon(
-                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                // one coloured pill per subject
+                if (teacher.subjectNames.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        teacher.subjectNames.forEach { subject ->
+                            val c = subjectColor(subject)
+                            Box(
+                                modifier = Modifier
+                                    .background(c.copy(alpha = 0.13f), RoundedCornerShape(50))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = subject,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = c,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.Description,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (materialCount == 1) "1 material" else "$materialCount materials",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    // "view" pill with the app gradient
+                    Row(
+                        modifier = Modifier
+                            .background(
+                                Brush.horizontalGradient(listOf(NenaPrimary, NenaSecondary)),
+                                RoundedCornerShape(50)
+                            )
+                            .padding(start = 14.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "View",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
         }
     }

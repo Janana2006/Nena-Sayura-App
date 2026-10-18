@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Logo for the system splash: round badge (white ring + blue gradient) with the app logo.
+     It is shown the moment the app is tapped, before Compose is ready. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:width="72dp"
+        android:height="72dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <solid android:color="#FFFFFF" />
+        </shape>
+    </item>
+    <item
+        android:width="66dp"
+        android:height="66dp"
+        android:gravity="center">
+        <shape android:shape="oval">
+            <gradient
+                android:angle="315"
+                android:centerColor="#1A6B9B"
+                android:endColor="#00796B"
+                android:startColor="#234FB1"
+                android:type="linear" />
+        </shape>
+    </item>
+    <item
+        android:drawable="@drawable/ic_launcher_foreground"
+        android:gravity="center" />
+</layer-list>
