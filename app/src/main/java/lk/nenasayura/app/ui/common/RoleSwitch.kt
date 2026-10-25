@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.VolunteerActivism
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -382,12 +384,14 @@ private fun BecomeRoleFlow(
                         onClick = { isFree = true; feeError = null }
                     )
                     Spacer(modifier = Modifier.height(10.dp))
+                    // Paid is locked for now (coming soon)
                     ServiceOptionCard(
                         title = "Paid",
-                        description = "Set a fee for students who use your service",
+                        description = "Coming soon",
                         icon = Icons.Default.Payments,
-                        selected = !isFree,
-                        onClick = { isFree = false }
+                        selected = false,
+                        locked = true,
+                        onClick = { }
                     )
 
                     if (!isFree) {
@@ -497,7 +501,8 @@ private fun ServiceOptionCard(
     description: String,
     icon: ImageVector,
     selected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    locked: Boolean = false
 ) {
     val borderColor by animateColorAsState(
         if (selected) NenaPrimary else Color(0xFFE3E6EF), label = "serviceBorder"
@@ -509,10 +514,11 @@ private fun ServiceOptionCard(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .alpha(if (locked) 0.55f else 1f)
             .clip(RoundedCornerShape(20.dp))
             .background(bg)
             .border(if (selected) 2.dp else 1.dp, borderColor, RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick)
+            .clickable(enabled = !locked, onClick = onClick)
             .padding(14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -542,7 +548,9 @@ private fun ServiceOptionCard(
             )
             Text(text = description, fontSize = 12.sp, color = RoleGreyText)
         }
-        if (selected) {
+        if (locked) {
+            Icon(Icons.Default.Lock, contentDescription = "Locked", tint = RoleGreyText)
+        } else if (selected) {
             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NenaSecondary)
         }
     }

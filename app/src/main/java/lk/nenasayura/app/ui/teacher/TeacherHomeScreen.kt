@@ -39,7 +39,7 @@ import lk.nenasayura.app.ui.teacher.dashboard.TeacherDashboardScreen
 import lk.nenasayura.app.ui.teacher.notifications.NotificationBell
 import lk.nenasayura.app.ui.teacher.notifications.TeacherNotificationsScreen
 import lk.nenasayura.app.ui.teacher.notifications.TeacherNotificationsViewModel
-import lk.nenasayura.app.ui.teacher.payments.TeacherPaymentsTab
+import lk.nenasayura.app.ui.teacher.payments.TeacherPaymentsComingSoon
 import lk.nenasayura.app.ui.teacher.profile.TeacherProfileTab
 import lk.nenasayura.app.ui.teacher.upload.UploadScreen
 import lk.nenasayura.app.ui.theme.NenaPrimary
@@ -196,10 +196,14 @@ fun TeacherHomeScreen(
                     modifier = Modifier.padding(innerPadding)
                 )
 
-                TeacherTab.Payments -> TeacherPaymentsTab(
-                    profile = profile,
-                    saving = state.saving,
-                    onSave = viewModel::saveBankDetails,
+                // Payments are coming soon. When released, switch back to TeacherPaymentsTab:
+                // TeacherTab.Payments -> TeacherPaymentsTab(
+                //     profile = profile,
+                //     saving = state.saving,
+                //     onSave = viewModel::saveBankDetails,
+                //     modifier = Modifier.padding(innerPadding)
+                // )
+                TeacherTab.Payments -> TeacherPaymentsComingSoon(
                     modifier = Modifier.padding(innerPadding)
                 )
 

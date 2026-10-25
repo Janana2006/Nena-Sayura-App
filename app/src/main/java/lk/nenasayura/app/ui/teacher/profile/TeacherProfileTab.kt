@@ -511,11 +511,12 @@ private fun EditPage(
                     label = { Text("Free") },
                     enabled = !saving
                 )
+                // Paid is locked for now (coming soon)
                 FilterChip(
                     selected = !isFree,
                     onClick = { isFree = false },
-                    label = { Text("Paid") },
-                    enabled = !saving
+                    label = { Text("Paid · Coming soon") },
+                    enabled = false
                 )
             }
             if (!isFree) {

@@ -48,6 +48,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -269,11 +270,13 @@ fun RegisterScreen(
                                     onClick = { isFree = true },
                                     modifier = Modifier.weight(1f)
                                 )
+                                // Paid is locked for now (coming soon)
                                 ServiceOption(
                                     title = "Paid",
-                                    subtitle = "Students pay a fee",
-                                    selected = !isFree,
-                                    onClick = { isFree = false },
+                                    subtitle = "Coming soon",
+                                    selected = false,
+                                    locked = true,
+                                    onClick = { },
                                     modifier = Modifier.weight(1f)
                                 )
                             }
@@ -401,20 +404,22 @@ private fun ServiceOption(
     subtitle: String,
     selected: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    locked: Boolean = false
 ) {
     val accent = if (title == "Paid") NenaAccent else NenaSecondary
     val container = if (title == "Paid") NenaAccentContainer else NenaPrimaryContainer
 
     Column(
         modifier = modifier
+            .alpha(if (locked) 0.55f else 1f)
             .background(if (selected) container else Color.White, RoundedCornerShape(16.dp))
             .border(
                 width = if (selected) 2.dp else 1.dp,
                 color = if (selected) accent else Color(0xFFE0E3EB),
                 shape = RoundedCornerShape(16.dp)
             )
-            .clickable(onClick = onClick)
+            .clickable(enabled = !locked, onClick = onClick)
             .padding(14.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -424,7 +429,9 @@ private fun ServiceOption(
                 color = if (selected) Color(0xFF1B1B1F) else Color(0xFF6B7280),
                 modifier = Modifier.weight(1f)
             )
-            if (selected) {
+            if (locked) {
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = Color(0xFF6B7280), modifier = Modifier.size(18.dp))
+            } else if (selected) {
                 Icon(Icons.Default.CheckCircle, contentDescription = null, tint = accent, modifier = Modifier.size(20.dp))
             }
         }
